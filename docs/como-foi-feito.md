@@ -617,3 +617,15 @@ E dois combinados que mantêm esta documentação útil:
 
 - **Mudou uma regra de negócio?** Atualize o [Regras de negócio](regras-de-negocio.md) no mesmo PR.
 - **Tomou uma decisão que muda o rumo do projeto?** Conte o porquê na descrição do PR e, se for uma decisão de fundo, aqui neste guia.
+
+
+## Issue #40 — Primeira etapa: profissionais e serviços
+
+- `PerfilProfissional` complementa `Usuario`, evitando contas duplicadas.
+- `Servico` aponta para `PerfilProfissional` **ou** `Empresa`; a constraint `Servico_prestador_check` na migração impede dois prestadores ou ausência de prestador.
+- As validações e o índice normalizado para busca estão em `src/lib/servicos.ts`.
+- As Server Actions estão em `src/acoes/servicos.ts` e conferem as permissões com sessão, vínculo de dono e papel de moderador.
+- O catálogo público fica em `/servicos`, o painel em `/painel/servicos` e a revisão de novos anúncios em `/moderacao/servicos`.
+- Esta entrega é o primeiro PR da issue #40; solicitações de orçamento, propostas e pagamentos ficam fora de escopo.
+- Interface mobile-first com grids responsivos; reutiliza as cores e tipografias definidas em `src/app/globals.css`, inclusive no modo escuro. Não introduz outra paleta.
+- `IconeRede` usa SVG leve e `SeletorModalidades` mantém checkboxes nativos e foco visível.

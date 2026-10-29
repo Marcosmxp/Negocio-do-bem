@@ -828,3 +828,14 @@ O sistema funciona hoje assim. Algumas destas situações podem ser intencionais
 - Fotos da história que saem do texto, ou que foram enviadas e nunca salvas, continuam no armazenamento.
 
 Os [próximos passos do README](../README.md#próximos-passos-sugeridos) listam outras ideias.
+
+
+## Issue #40 — Perfis profissionais e catálogo de serviços (primeira etapa)
+
+- O perfil profissional é opcional e vinculado a um usuário autenticado. A pessoa pode ocultá-lo.
+- O contato profissional somente é exibido se fornecido voluntariamente e o perfil estiver publicado.
+- Cada serviço pertence a **exatamente um prestador**: perfil profissional publicado ou empresa verificada da qual o autor seja dono. A migração impõe uma restrição de exclusividade no PostgreSQL.
+- Novos anúncios começam como `pendente`; apenas a moderação pode mudar para `publicado` ou `rejeitado`. Somente anúncios publicados, não ocultos e de prestadores visíveis aparecem em `/servicos`.
+- Quem criou o serviço pode ocultá-lo ou reexibi-lo. Ainda não é possível editar os dados do anúncio nesta primeira entrega.
+- A verificação de permissão ocorre nas Server Actions, e as decisões são registradas na auditoria.
+- Não há pagamentos, propostas de orçamento, avaliações, denúncias de anúncios ou chat nesta primeira etapa.

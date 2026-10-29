@@ -37,6 +37,7 @@ export default function Moderacao(props: PageProps<"/moderacao">) {
   return (
     <div className="mx-auto max-w-5xl px-4 pt-12 sm:px-6">
       <h1 className="font-serif text-4xl font-semibold tracking-tight">Moderação</h1>
+      <Link href="/moderacao/servicos" className="link mt-3 inline-block text-sm">Analisar anúncios de serviços →</Link>
       <Suspense fallback={<div className="mt-8 h-96 animate-pulse rounded-3xl bg-superficie" />}>
         <Conteudo searchParams={props.searchParams} />
       </Suspense>
