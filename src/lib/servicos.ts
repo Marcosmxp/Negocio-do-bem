@@ -1,12 +1,28 @@
 import { z } from "zod";
 import { campoEmail, campoMunicipio, campoSite } from "@/lib/formulario";
 import { normalizarTexto } from "@/lib/texto";
+import { CATEGORIAS_SERVICOS } from "@/lib/servicos/dominio";
+export { CATEGORIAS_SERVICOS } from "@/lib/servicos/dominio";
 
-export const CATEGORIAS_SERVICOS = [
-  "Tecnologia", "Design e comunicação", "Marketing", "Construção e reformas",
-  "Manutenção e reparos", "Logística e entregas", "Contabilidade e gestão",
-  "Educação", "Limpeza", "Fotografia e vídeo", "Alimentação", "Outros",
-] as const;
+/** Domínio compartilhado entre o navegador e o servidor: sem acesso ao banco. */
+export const ESTADOS_SERVICO = {
+  pendente: "Em análise",
+  publicado: "Publicado",
+  rejeitado: "Não aprovado",
+} as const;
+
+export const POR_PAGINA_SERVICOS = 18;
+export const MAX_PAGINAS_SERVICOS = 500;
+
+export function numeroPagina(valor: unknown): number {
+  if (typeof valor !== "string" || !/^[1-9]\d{0,5}$/.test(valor)) return 1;
+  return Math.min(Number(valor), MAX_PAGINAS_SERVICOS);
+}
+
+export function limitarPagina(pagina: number, total: number, tamanho = POR_PAGINA_SERVICOS) {
+  const paginas = Math.min(MAX_PAGINAS_SERVICOS, Math.max(1, Math.ceil(total / tamanho)));
+  return { pagina: Math.min(Math.max(1, pagina), paginas), paginas };
+}
 
 export const esquemaPerfilProfissional = z.object({
   nomePublico: z.string().trim().min(2, "Informe um nome profissional.").max(80),
@@ -17,7 +33,13 @@ export const esquemaPerfilProfissional = z.object({
   emailContato: campoEmail,
   site: campoSite,
   publicado: z.boolean(),
-}).refine((p) => p.remoto || p.presencial, { path: ["modalidade"], message: "Escolha pelo menos uma modalidade." });
+})
+  .refine((perfil) => perfil.remoto || perfil.presencial, {
+    path: ["modalidade"], message: "Escolha pelo menos uma modalidade.",
+  })
+  .refine((perfil) => !perfil.publicado || !!perfil.emailContato || !!perfil.site, {
+    path: ["emailContato"], message: "Para publicar, informe um e-mail profissional ou site.",
+  });
 
 export const esquemaServico = z.object({
   prestador: z.enum(["profissional", "empresa"]),
@@ -27,26 +49,30 @@ export const esquemaServico = z.object({
   categoria: z.enum(CATEGORIAS_SERVICOS),
   remoto: z.boolean(),
   presencial: z.boolean(),
-  precoReferencia: z.string().trim().max(100).transform((s) => s || null),
-}).refine((s) => s.remoto || s.presencial, { path: ["modalidade"], message: "Escolha pelo menos uma modalidade." })
-  .refine((s) => s.prestador !== "empresa" || !!s.empresaId, { path: ["empresaId"], message: "Escolha a empresa." });
+  precoReferencia: z.string().trim().max(100).transform((valor) => valor || null),
+})
+  .refine((servico) => servico.remoto || servico.presencial, {
+    path: ["modalidade"], message: "Escolha pelo menos uma modalidade.",
+  })
+  .refine((servico) => servico.prestador !== "empresa" || !!servico.empresaId, {
+    path: ["empresaId"], message: "Escolha a empresa.",
+  })
+  .refine((servico) => servico.prestador !== "profissional" || !servico.empresaId, {
+    path: ["empresaId"], message: "O serviço pessoal não pode estar vinculado a uma empresa.",
+  });
+
+export const esquemaModeracaoServico = z.discriminatedUnion("decisao", [
+  z.object({ decisao: z.literal("aprovar") }),
+  z.object({
+    decisao: z.literal("rejeitar"),
+    motivo: z.string().trim().min(10, "Informe o motivo da recusa (mínimo 10 caracteres).").max(500),
+  }),
+]);
+
+export function idServicoValido(valor: string): boolean {
+  return /^[a-z0-9]{1,40}$/.test(valor);
+}
 
 export function buscaServico(dados: { titulo: string; descricao: string; categoria: string; cidade: string; uf: string }) {
   return normalizarTexto([dados.titulo, dados.descricao, dados.categoria, dados.cidade, dados.uf].join(" "));
-}
-
-/** O catálogo só inclui ofertas aprovadas, não ocultas e com prestador publicamente visível. */
-export function filtroServicosPublicos(q: string, categoria: string) {
-  const termos = normalizarTexto(q).slice(0, 100).split(" ").filter(Boolean).slice(0, 6);
-  const selecionada = CATEGORIAS_SERVICOS.find((c) => c === categoria);
-  return {
-    status: "publicado",
-    oculto: false,
-    OR: [
-      { perfil: { is: { publicado: true } } },
-      { empresa: { is: { moderacao: "aprovada", oculta: false, status: "verificada" } } },
-    ],
-    ...(selecionada ? { categoria: selecionada } : {}),
-    AND: termos.map((termo) => ({ busca: { contains: termo } })),
-  };
 }

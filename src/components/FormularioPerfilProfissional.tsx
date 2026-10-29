@@ -37,7 +37,7 @@ export function FormularioPerfilProfissional({ perfil }: { perfil: Perfil | null
           <IconeRede nome="pessoa" className="h-6 w-6" />
         </div>
         <h2 className="font-serif text-2xl font-semibold tracking-tight sm:text-3xl">Perfil profissional</h2>
-        <p className="mt-2 text-sm leading-relaxed text-suave">Conte quem você é e como atende. Você controla quando esse perfil fica público.</p>
+        <p className="mt-2 text-sm leading-relaxed text-suave">Conte quem você é e como atende. Para publicar, informe um e-mail profissional ou um site.</p>
       </div>
 
       <div className="space-y-6 p-5 sm:p-7">
@@ -74,7 +74,7 @@ export function FormularioPerfilProfissional({ perfil }: { perfil: Perfil | null
           <input type="checkbox" name="publicado" value="sim" defaultChecked={marcado("publicado", perfil?.publicado)} className="mt-1 h-4 w-4 shrink-0 accent-folha" />
           <span>
             <span className="block text-sm font-semibold">Publicar meu perfil profissional</span>
-            <span className="mt-1 block text-xs leading-relaxed text-suave">Você poderá ocultar o perfil a qualquer momento. Os serviços associados deixam de aparecer quando ele estiver oculto.</span>
+            <span className="mt-1 block text-xs leading-relaxed text-suave">Você poderá ocultar o perfil a qualquer momento. Alterações nos dados públicos enviarão seus anúncios novamente para análise.</span>
           </span>
         </label>
         {estado?.erro && <Aviso tipo="erro">{estado.erro}</Aviso>}

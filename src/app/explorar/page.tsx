@@ -5,6 +5,7 @@ import { BuscaDiretorio } from "@/components/BuscaDiretorio";
 import { EmpresaCard } from "@/components/EmpresaCard";
 import { EmpresaLinha } from "@/components/EmpresaLinha";
 import { IconeCategoria } from "@/components/IconeCategoria";
+import { Paginacao } from "@/components/Paginacao";
 import { buscarCausa, CAUSAS, GRUPOS, type GrupoCausa } from "@/lib/causas";
 import { buscarDiretorio } from "@/lib/consultas";
 import {
@@ -19,12 +20,17 @@ import {
   type Ordem,
 } from "@/lib/diretorio";
 import { CATEGORIAS } from "@/lib/dominio";
+import { metadadosDaPagina } from "@/lib/seo";
 import { OrdenarPor } from "./OrdenarPor";
 
-export const metadata: Metadata = {
-  title: "Explorar negócios",
-  description: "Busque negócios do bem por cidade, tipo de negócio e pelas causas que importam para você.",
-};
+// Com filtros, o canônico continua sendo /explorar: as combinações de filtros
+// não viram páginas separadas na busca.
+export const metadata: Metadata = metadadosDaPagina({
+  titulo: "Explorar negócios",
+  descricao:
+    "Busque negócios do bem por cidade, tipo de negócio e pelas causas que importam para você: liderados por mulheres, afroempreendedores, opções veganas, sustentáveis e mais.",
+  caminho: "/explorar",
+});
 
 // Os tipos com mais negócios aparecem direto; o resto fica em "Ver todos".
 const TIPOS_VISIVEIS = 8;
@@ -149,28 +155,7 @@ async function Diretorio({ searchParams }: Pick<PageProps<"/explorar">, "searchP
             <Vazio filtros={filtros} resultado={resultado} />
           )}
 
-          {resultado.paginas > 1 && (
-            <nav aria-label="Paginação" className="mt-8 flex flex-wrap items-center justify-center gap-2">
-              {paginasVisiveis(Math.min(filtros.pagina, resultado.paginas), resultado.paginas).map((pagina, i) =>
-                pagina === null ? (
-                  <span key={`intervalo-${i}`} className="px-1 text-suave" aria-hidden="true">
-                    …
-                  </span>
-                ) : (
-                  <Link
-                    key={pagina}
-                    href={hrefDiretorio({ ...filtros, pagina })}
-                    aria-current={pagina === filtros.pagina ? "page" : undefined}
-                    className={`grid h-10 min-w-10 place-items-center rounded-full border px-3 text-sm font-semibold transition ${
-                      pagina === filtros.pagina ? "border-tinta bg-tinta text-papel" : "border-linha bg-superficie hover:border-tinta/40"
-                    }`}
-                  >
-                    {pagina}
-                  </Link>
-                ),
-              )}
-            </nav>
-          )}
+          <Paginacao atual={filtros.pagina} total={resultado.paginas} href={(pagina) => hrefDiretorio({ ...filtros, pagina })} />
         </div>
       </div>
     </>
@@ -363,14 +348,6 @@ function filtrosAtivos(filtros: FiltrosDiretorio, local: Local | null) {
   }
   if (filtros.verificados) ativos.push({ rotulo: "Só verificados", href: mudarFiltro(filtros, { verificados: false }) });
   return ativos;
-}
-
-/** Números da paginação: todos até 7 páginas; depois, a primeira, a última e as vizinhas da atual. */
-function paginasVisiveis(atual: number, total: number): (number | null)[] {
-  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
-  const perto = [1, atual - 1, atual, atual + 1, total].filter((p) => p >= 1 && p <= total);
-  const unicas = [...new Set(perto)].sort((a, b) => a - b);
-  return unicas.flatMap((p, i) => (i > 0 && p - unicas[i - 1]! > 1 ? [null, p] : [p]));
 }
 
 function IconeFiltros() {

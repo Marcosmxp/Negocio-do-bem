@@ -1,110 +1,179 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { exigirModerador, exigirUsuario } from "@/lib/auth/sessao";
 import { db } from "@/lib/db";
 import { errosPorCampo, texto, valoresDoFormulario, type EstadoFormulario } from "@/lib/formulario";
-import { buscaServico, esquemaPerfilProfissional, esquemaServico } from "@/lib/servicos";
+import {
+  buscaServico, esquemaModeracaoServico, esquemaPerfilProfissional,
+  esquemaServico, idServicoValido,
+} from "@/lib/servicos";
+import { identificarPrestador, podeGerirServico } from "@/lib/servicos/permissoes";
+import { estadoAposRevisao } from "@/lib/servicos/transicoes";
 
-const DESTINO = "/painel/servicos";
+const PAINEL = "/painel/servicos";
+const FILA = "/moderacao/servicos";
+
+function atualizarPaginas() {
+  revalidatePath("/servicos");
+  revalidatePath(PAINEL);
+  revalidatePath(FILA);
+}
 
 export async function salvarPerfilProfissional(_estado: EstadoFormulario, dados: FormData): Promise<EstadoFormulario> {
-  const usuario = await exigirUsuario(DESTINO);
+  const usuario = await exigirUsuario(PAINEL);
   const valores = valoresDoFormulario(dados);
   const resultado = esquemaPerfilProfissional.safeParse({
-    nomePublico: texto(dados, "nomePublico"),
-    apresentacao: texto(dados, "apresentacao"),
-    municipio: texto(dados, "municipio"),
-    remoto: dados.get("remoto") === "sim",
-    presencial: dados.get("presencial") === "sim",
-    emailContato: texto(dados, "emailContato"),
-    site: texto(dados, "site"),
-    publicado: dados.get("publicado") === "sim",
+    nomePublico: texto(dados, "nomePublico"), apresentacao: texto(dados, "apresentacao"),
+    municipio: texto(dados, "municipio"), remoto: dados.get("remoto") === "sim",
+    presencial: dados.get("presencial") === "sim", emailContato: texto(dados, "emailContato"),
+    site: texto(dados, "site"), publicado: dados.get("publicado") === "sim",
   });
   if (!resultado.success) return { erros: errosPorCampo(resultado.error), valores };
   const { municipio, ...perfil } = resultado.data;
   await db.$transaction(async (tx) => {
+    const anterior = await tx.perfilProfissional.findUnique({ where: { usuarioId: usuario.id } });
+    const alterouInformacaoPublica = anterior && (
+      anterior.nomePublico !== perfil.nomePublico ||
+      anterior.apresentacao !== perfil.apresentacao ||
+      anterior.cidade !== municipio.nome || anterior.uf !== municipio.uf ||
+      anterior.remoto !== perfil.remoto || anterior.presencial !== perfil.presencial ||
+      anterior.emailContato !== perfil.emailContato || anterior.site !== perfil.site
+    );
     await tx.perfilProfissional.upsert({
       where: { usuarioId: usuario.id },
       create: { usuarioId: usuario.id, ...perfil, cidade: municipio.nome, uf: municipio.uf },
       update: { ...perfil, cidade: municipio.nome, uf: municipio.uf },
     });
+    // Alterações na identidade/contato do prestador exigem nova análise dos anúncios.
+    if (alterouInformacaoPublica) {
+      await tx.servico.updateMany({
+        where: { perfilUsuarioId: usuario.id, status: "publicado" },
+        data: { status: "pendente", motivoRecusa: null, moderadoEm: null },
+      });
+    }
     await registrarAuditoria(tx, {
-      usuarioId: usuario.id, acao: "perfil_profissional.salvo", alvoTipo: "perfilProfissional", alvoId: usuario.id,
+      usuarioId: usuario.id, acao: "perfil_profissional.salvo",
+      alvoTipo: "perfilProfissional", alvoId: usuario.id,
     });
   });
-  redirect(`${DESTINO}?aviso=perfil_salvo`);
+  atualizarPaginas();
+  redirect(`${PAINEL}?aviso=perfil_salvo`);
 }
 
-export async function criarServico(_estado: EstadoFormulario, dados: FormData): Promise<EstadoFormulario> {
-  const usuario = await exigirUsuario(DESTINO);
+/** A mesma action cria ou revisa um serviço; em ambos os casos há validação de propriedade. */
+export async function salvarServico(_estado: EstadoFormulario, dados: FormData): Promise<EstadoFormulario> {
+  const usuario = await exigirUsuario(PAINEL);
   const valores = valoresDoFormulario(dados);
-  const resultado = esquemaServico.safeParse({
+  const id = texto(dados, "id");
+  if (id && !idServicoValido(id)) return { erro: "Anúncio inválido.", valores };
+  const validado = esquemaServico.safeParse({
     prestador: texto(dados, "prestador"), empresaId: texto(dados, "empresaId") || undefined,
     titulo: texto(dados, "titulo"), descricao: texto(dados, "descricao"),
     categoria: texto(dados, "categoria"), remoto: dados.get("remoto") === "sim",
     presencial: dados.get("presencial") === "sim", precoReferencia: texto(dados, "precoReferencia"),
   });
-  if (!resultado.success) return { erros: errosPorCampo(resultado.error), valores };
-  const { prestador, empresaId, ...servico } = resultado.data;
-  let cidade: string;
-  let uf: string;
-  let dono: { perfilUsuarioId: string | null; empresaId: string | null };
+  if (!validado.success) return { erros: errosPorCampo(validado.error), valores };
+  const { prestador, empresaId, ...conteudo } = validado.data;
 
-  if (prestador === "profissional") {
-    const perfil = await db.perfilProfissional.findUnique({ where: { usuarioId: usuario.id } });
-    if (!perfil?.publicado) return { erro: "Publique primeiro seu perfil profissional.", valores };
-    ({ cidade, uf } = perfil);
-    dono = { perfilUsuarioId: usuario.id, empresaId: null };
-  } else {
-    const membro = await db.empresaMembro.findUnique({
-      where: { empresaId_usuarioId: { empresaId: empresaId!, usuarioId: usuario.id } }, include: { empresa: true },
-    });
-    if (!membro || membro.empresa.status !== "verificada" || membro.empresa.moderacao !== "aprovada" || membro.empresa.oculta) {
-      return { erro: "Você só pode anunciar por um negócio verificado, publicado e do qual é dono.", valores };
+  const resultado = await db.$transaction(async (tx) => {
+    const destino = await identificarPrestador(tx, usuario.id, prestador, empresaId);
+    if (!destino) return { erro: "Publique seu perfil ou escolha um negócio verificado que você administra." };
+
+    if (id) {
+      const anuncio = await podeGerirServico(tx, usuario.id, id);
+      if (!anuncio) return { erro: "O serviço não existe ou você não pode editá-lo." };
+      if (anuncio.perfilUsuarioId !== destino.perfilUsuarioId || anuncio.empresaId !== destino.empresaId) {
+        return { erro: "Não é permitido transferir um anúncio entre prestadores." };
+      }
+      await tx.servico.update({
+        where: { id },
+        data: {
+          ...conteudo, cidade: destino.cidade, uf: destino.uf,
+          busca: buscaServico({ ...conteudo, cidade: destino.cidade, uf: destino.uf }),
+          status: estadoAposRevisao(), motivoRecusa: null, moderadoEm: null,
+        },
+      });
+      await registrarAuditoria(tx, { usuarioId: usuario.id, acao: "servico.reenviado", alvoTipo: "servico", alvoId: id });
+      return { ok: true };
     }
-    ({ cidade, uf } = membro.empresa);
-    dono = { perfilUsuarioId: null, empresaId: membro.empresaId };
-  }
 
-  await db.$transaction(async (tx) => {
     const criado = await tx.servico.create({
-      data: { ...servico, ...dono, cidade, uf, busca: buscaServico({ ...servico, cidade, uf }), status: "pendente" },
+      data: {
+        ...conteudo, ...destino,
+        busca: buscaServico({ ...conteudo, cidade: destino.cidade, uf: destino.uf }),
+        status: "pendente",
+      },
     });
-    await registrarAuditoria(tx, {
-      usuarioId: usuario.id, acao: "servico.criado", alvoTipo: "servico", alvoId: criado.id,
-    });
+    await registrarAuditoria(tx, { usuarioId: usuario.id, acao: "servico.criado", alvoTipo: "servico", alvoId: criado.id });
+    return { ok: true };
   });
-  redirect(`${DESTINO}?aviso=servico_enviado`);
+
+  if ("erro" in resultado) return { erro: resultado.erro, valores };
+  atualizarPaginas();
+  redirect(`${PAINEL}?aviso=servico_enviado`);
 }
 
-/** Permissão verificada no servidor; não basta esconder o botão da interface. */
 export async function alternarServico(dados: FormData): Promise<void> {
-  const usuario = await exigirUsuario(DESTINO);
+  const usuario = await exigirUsuario(PAINEL);
   const id = texto(dados, "id");
-  const oculto = dados.get("oculto") === "sim";
+  const acao = texto(dados, "oculto");
+  if (!idServicoValido(id) || !["sim", "nao"].includes(acao)) redirect(PAINEL);
+  const oculto = acao === "sim";
   await db.$transaction(async (tx) => {
-    const servico = await tx.servico.findUnique({ where: { id }, select: { perfilUsuarioId: true, empresaId: true } });
-    if (!servico) return;
-    const autorizado = servico.perfilUsuarioId === usuario.id || (!!servico.empresaId && !!(await tx.empresaMembro.findUnique({
-      where: { empresaId_usuarioId: { empresaId: servico.empresaId, usuarioId: usuario.id } },
-    })));
-    if (!autorizado) return;
-    await tx.servico.update({ where: { id }, data: { oculto } });
-    await registrarAuditoria(tx, { usuarioId: usuario.id, acao: oculto ? "servico.oculto" : "servico.reativado", alvoTipo: "servico", alvoId: id });
+    // Autorização e escrita numa só condição, evitando alterações por IDs de terceiros.
+    const { count } = await tx.servico.updateMany({
+      where: {
+        id,
+        OR: [
+          { perfilUsuarioId: usuario.id },
+          { empresa: { is: { membros: { some: { usuarioId: usuario.id } } } } },
+        ],
+      },
+      data: { oculto },
+    });
+    if (count) await registrarAuditoria(tx, {
+      usuarioId: usuario.id, acao: oculto ? "servico.oculto" : "servico.reativado",
+      alvoTipo: "servico", alvoId: id,
+    });
   });
-  redirect(DESTINO);
+  atualizarPaginas();
+  redirect(PAINEL);
 }
 
 export async function moderarServico(dados: FormData): Promise<void> {
   const moderador = await exigirModerador();
   const id = texto(dados, "id");
-  const status = dados.get("decisao") === "aprovar" ? "publicado" : "rejeitado";
-  await db.$transaction(async (tx) => {
-    const { count } = await tx.servico.updateMany({ where: { id, status: "pendente" }, data: { status } });
-    if (!count) return;
-    await registrarAuditoria(tx, { usuarioId: moderador.id, acao: `servico.${status}`, alvoTipo: "servico", alvoId: id });
+  const validado = esquemaModeracaoServico.safeParse({
+    decisao: texto(dados, "decisao"), motivo: texto(dados, "motivo"),
   });
-  redirect("/moderacao/servicos");
+  if (!idServicoValido(id) || !validado.success) redirect(`${FILA}?aviso=dados_invalidos`);
+
+  const decisao = validado.data;
+  const status = decisao.decisao === "aprovar" ? "publicado" : "rejeitado";
+  const resultado = await db.$transaction(async (tx) => {
+    const { count } = await tx.servico.updateMany({
+      where: {
+        id, status: "pendente",
+        ...(status === "publicado" ? {
+          OR: [
+            { perfil: { is: { publicado: true } } },
+            { empresa: { is: { status: "verificada", moderacao: "aprovada", oculta: false } } },
+          ],
+        } : {}),
+      },
+      data: {
+        status, moderadoEm: new Date(),
+        motivoRecusa: decisao.decisao === "rejeitar" ? decisao.motivo : null,
+      },
+    });
+    if (count) await registrarAuditoria(tx, {
+      usuarioId: moderador.id, acao: `servico.${status}`, alvoTipo: "servico", alvoId: id,
+    });
+    return count;
+  });
+  atualizarPaginas();
+  redirect(`${FILA}?aviso=${resultado ? "feito" : "indisponivel"}`);
 }

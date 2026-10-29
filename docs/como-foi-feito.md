@@ -277,6 +277,54 @@ Os previews também usavam o Vercel Blob de produção, onde ficam as fotos. Ent
 - **O Preview ganhou um Blob público próprio,** e o de produção ficou só em Production. As credenciais de cada ambiente, o token e o OIDC do deploy, só alcançam o Blob dele.
 - **O código não precisou mudar.** O site aceita fotos de qualquer store do Vercel Blob (`ehFotoDoSite`), então as fotos enviadas num preview aparecem no próprio preview. Um teste garante isso.
 
+### 29 de outubro: nova identidade visual e SEO ([#62](https://github.com/fabsreis/Negocio-do-bem/issues/62), [#63](https://github.com/fabsreis/Negocio-do-bem/issues/63))
+
+O site ganhou o logo novo, com três pessoas formando um coração, e passou a se apresentar direito para o Google, o Bing e os assistentes que buscam na web.
+
+- **Um desenho só para tudo.** `src/lib/marca.ts` guarda o ícone e o texto do logo. Dele saem o `Logo` do cabeçalho e do rodapé, os ícones (`npm run marca:icones`) e as imagens de compartilhamento.
+- **O texto do logo foi vetorizado do PNG.** O SVG exportado do manual trazia o texto como fonte (Casko Luxury), sem curvas, e o "em" de "Bem" saía vazio. Quando chegar um SVG com o texto em curvas, basta trocar `TEXTO_DO_LOGO`.
+- **Cores da marca fixas.** `marca-laranja`, `marca-verde`, `marca-marrom` e `marca-creme` não mudam no modo escuro. No escuro, o logo troca o marrom pelo creme, como na versão do manual para fundo escuro. As cores do tema passaram a partir delas: o creme é o papel, e o marrom é a tinta.
+- **Prévia de link com a marca.** `opengraph-image.tsx` gera a imagem geral no build, e cada perfil tem a sua, com foto, nome, cidade e causas. As fontes ficam em `assets/fontes`, porque o gerador não lê woff2 nem fonte variável.
+- **SEO:**
+  - `metadataBase`, canônico e Open Graph em cada página pública;
+  - sitemap com os negócios do diretório e `robots.txt`;
+  - dados estruturados: `Organization` e `WebSite` na página inicial, `LocalBusiness` e `BreadcrumbList` no perfil;
+  - `noindex` nas páginas de conta;
+  - um `llms.txt` para assistentes de IA.
+
+  O título do perfil traz o tipo e a cidade, que é o que as pessoas buscam.
+- **Um endereço só.** Os links absolutos usam o domínio de produção (`VERCEL_PROJECT_PRODUCTION_URL`) até nos previews, e os previews bloqueiam os robôs.
+
+### 29 de outubro: páginas de cidade, causa e tipo ([#71](https://github.com/fabsreis/Negocio-do-bem/issues/71))
+
+O diretório filtra pela URL, e o canônico de `/explorar` ignora os filtros, para as combinações não virarem milhares de páginas parecidas na busca. Faltavam páginas para responder às buscas mais comuns: "negócios do bem em Salvador", "negócios liderados por mulheres", "café e padaria".
+
+- **Três páginas fixas:** `/cidades/salvador-ba` (e o índice `/cidades`), `/causas/opcoes-veganas` e `/tipos/cafe-e-padaria`. Cada uma tem título, descrição, canônico e JSON-LD próprios (`CollectionPage`, `ItemList` e `BreadcrumbList`).
+- **Reaproveitam o diretório.** A lista vem de `buscarDiretorio` com um filtro só, então a página da cidade segue as mesmas regras do "Onde?", inclusive a junção das grafias. O componente `Vitrine` monta as três.
+- **Porta de entrada, não substituto.** Os filtros continuam no `/explorar`: as páginas mostram os 18 primeiros e levam ao diretório com o filtro marcado.
+- **Ligadas por dentro.** O perfil liga tipo, cidade e causas às suas páginas, e o caminho dele no JSON-LD passa pela cidade. A página inicial, "Como funciona", o rodapé, o sitemap e o `llms.txt` também apontam para elas.
+- **Sem página vazia na busca.** Cidade sem negócios mostra a página de não encontrado, e causa ou tipo sem negócios leva `noindex` e fica fora do sitemap.
+
+### 29 de outubro: a mesma cidade com grafias diferentes ([#56](https://github.com/fabsreis/Negocio-do-bem/issues/56))
+
+O "Onde?" mostrava "São Paulo · 43 negócios", mas escolher a cidade trazia 1 só. E Florianópolis aparecia duas vezes, com e sem acento. Os cadastros de antes da lista do IBGE gravaram a cidade como foi digitada, e o diretório tratava cada grafia como uma cidade. Ao escolher "São Paulo, SP", o servidor pegava a primeira grafia que batia sem acento ("Sao Paulo") e filtrava só por ela.
+
+- **`listarCidades` junta as grafias** de cada cidade e UF e mostra o nome oficial (`nomeOficial`, em `src/lib/municipios.ts`). Acentos, maiúsculas, hífen e apóstrofo não importam, e a UF grudada no nome ("Tubarão-SC") sai. A lista do IBGE não tem duas cidades no mesmo estado que só mudem nesses detalhes.
+- **O filtro procura todas as grafias** que estão no banco (`condicaoDoLocal`, em `src/lib/consultas.ts`). Assim a contagem do "Onde?" bate com os resultados, mesmo que um nome fora do padrão volte a entrar.
+- **`npm run cidades:corrigir` arruma o banco,** para o perfil e os cartões também mostrarem o nome oficial. Ele grava direto no SQL, para não mudar o `atualizadoEm`, que ordena o diretório, e refaz o campo `busca`.
+- **As páginas de cidade usam o mesmo nome oficial.** O endereço (`/cidades/sao-paulo-sp`), as cidades de uma causa ou de um tipo (`cidadesCom`) e os links do perfil e do sitemap juntam as grafias. Assim, um negócio gravado como "Tubarão-SC" leva à página de Tubarão, SC.
+
+### 29 de outubro: painel da moderação ([#75](https://github.com/fabsreis/Negocio-do-bem/issues/75))
+
+A moderação via as filas, os 50 negócios atualizados por último e os 100 últimos registros da auditoria. Não dava para ver as contas, os números do projeto nem tudo o que uma pessoa fez no site.
+
+- **Um painel, não um sistema novo.** O `/moderacao` ganhou um menu lateral com a visão geral, as filas que já existiam, os cadastros (negócios, contas e depoimentos) e os registros (auditoria e sistema). Os endereços antigos (`?aba=reivindicacoes` e os outros) continuam valendo.
+- **Só consulta.** As ações continuam as mesmas. Dar moderação, suspender ou apagar uma conta mudam regras de permissão e de privacidade e ficaram para issues próprias.
+- **Números do banco, não de um serviço de métricas.** A visão geral conta direto no Postgres, a cada abertura, sem `use cache`. Os agrupamentos (`groupBy`) somam várias situações numa consulta só.
+- **Semanas de 7 dias corridos até agora.** A atividade não usa a semana do calendário: assim nenhuma semana fica pela metade e o fuso horário não muda a conta. O agrupamento (`agruparPorSemana`) é uma função pura, com teste.
+- **A ficha não lê a senha.** As consultas de contas usam sempre `select`, e um teste confere que o hash não vem junto.
+- **O que a URL traz é conferido.** Aba, situação, página, ação, pessoa e alvo passam por `lerFiltros`, como os filtros do diretório. O "Tirar do ar" volta para a lista filtrada de onde saiu, mas só aceita um endereço da própria moderação.
+
 ---
 
 ## 4. Arquitetura
@@ -325,10 +373,11 @@ As linhas tracejadas são serviços opcionais. O site funciona sem eles.
 | `prisma/` | Esquema do banco (`schema.prisma`), migrações e dados de exemplo (`seed.ts`). |
 | `src/app/` | Páginas e rotas. Cada pasta é um endereço: `explorar/` é o diretório, `empresas/[usuario]` é o perfil, `painel/` é o painel do dono, `moderacao/` é a moderação, `api/` tem as rotas do Instagram. |
 | `src/acoes/` | Server Actions, uma por formulário ou botão. Conferem a permissão e validam os dados. |
-| `src/lib/` | Regras de negócio e utilitários, sem interface: `reivindicacao.ts`, `consultas.ts`, `instagram.ts`, `causas.ts`, `cnpj.ts`, `formulario.ts`, `armazenamento.ts`, `auth/`… |
+| `src/lib/` | Regras de negócio e utilitários, sem interface: `reivindicacao.ts`, `consultas.ts`, `instagram.ts`, `causas.ts`, `cnpj.ts`, `formulario.ts`, `armazenamento.ts`, `auth/`, `moderacao/` (filtros, indicadores e consultas do painel da moderação)… |
 | `src/components/` | Componentes de interface reutilizados entre páginas. |
 | `tests/` | `unit/` (sem banco) e `db/` (com banco). |
 | `docs/` | Esta documentação e os prints do README. |
+| `assets/fontes/` | Fontes das imagens de compartilhamento, com a licença OFL de cada uma. |
 
 ### O banco
 
@@ -416,6 +465,7 @@ Erros que podem ser mostrados para a pessoa usam uma classe própria (`ErroReivi
 - **Componentes de formulário:** `Campo` (rótulo, ajuda e erro), `BotaoEnviar` (mostra "Enviando…"), `Aviso`.
 - **Classes de `globals.css`:** `.botao`, `.botao-coral`, `.botao-claro`, `.cartao`, `.campo`, `.link` e `.historia`. Prefira essas classes a repetir utilitários do Tailwind.
 - **Cores do tema:** `papel`, `superficie`, `tinta`, `suave`, `linha`, `coral` e `folha`. Para algo que só muda no escuro, use a variante `escuro:`.
+- **Cores da marca:** `marca-laranja`, `marca-verde`, `marca-marrom` e `marca-creme` são as do manual e não mudam no escuro. Use para a marca, não para a interface. O logo é o componente `Logo`, e a altura vem do `className`.
 - **Cor fixa nunca:** `bg-white` e afins não mudam no modo escuro. Use `superficie`.
 - **Tipografia:** textos longos usam a fonte serifada (Newsreader), e a interface usa a Inter.
 
@@ -430,7 +480,7 @@ npm run typecheck
 ```
 
 - **`tests/unit/`:** funções sem banco. Cobrem CNPJ, senha, normalização de texto, causas, campos de formulário, tempo de leitura, fotos (inclusive quando elas vão para o Vercel Blob) e Instagram.
-- **`tests/db/`:** as regras de reivindicação contra um Postgres de verdade:
+- **`tests/db/`:** as consultas do diretório e do painel da moderação, e as regras de reivindicação contra um Postgres de verdade:
   - código por DM;
   - Entrar com Instagram;
   - conflitos;
@@ -487,10 +537,11 @@ npm run typecheck
 | --- | --- | --- |
 | `DATABASE_URL` | Sim | Conexão com o Postgres. No Vercel, Production e Preview apontam para bancos diferentes. |
 | `DATABASE_URL_UNPOOLED` | No Neon | Conexão direta, usada pelas migrações. |
-| `APP_URL` | Sim | Endereço público do site, sem barra no final. |
+| `APP_URL` | Sim | Endereço público do site, sem barra no final. Fora do Vercel, também é a base dos links absolutos (canônico, sitemap e prévias de link). |
 | `BLOB_STORE_ID` | Em produção, no Vercel | Fotos no Vercel Blob. Criada com a conexão do Blob. O `@vercel/blob` se autentica pelo OIDC do deploy com este id. Production e Preview apontam para Blobs diferentes. |
 | `BLOB_READ_WRITE_TOKEN` | Em produção, fora do Vercel | Fotos no Vercel Blob onde não há OIDC. No Vercel, o site não precisa dela. |
 | `NEXT_PUBLIC_GA_ID` | Não | Google Analytics. Configure só em Production. |
+| `GOOGLE_SITE_VERIFICATION`, `BING_SITE_VERIFICATION` | Não | Meta tags de verificação do Google Search Console e do Bing Webmaster Tools. Configure só em Production. |
 | `FOTOS_TOKEN` | Não | Liga a rota da rotina de fotos do Instagram. No mínimo 32 caracteres. |
 | `INSTAGRAM_PERFIL_OFICIAL` | Não | Liga o código por DM. |
 | `INSTAGRAM_APP_ID`, `INSTAGRAM_APP_SECRET`, `INSTAGRAM_GRAPH_VERSION` | Não | Ligam o "Entrar com Instagram". |
@@ -506,10 +557,24 @@ O `.env.example` explica cada uma, e o [README](../README.md#publicando) tem o p
 
 ### Criar uma causa
 
-1. Acrescente a causa em `CAUSAS`, em `src/lib/causas.ts`, com slug, nome, emoji, descrição e grupo.
-2. Pronto: ela aparece nos filtros, nos formulários e em "Como funciona".
+1. Acrescente a causa em `CAUSAS`, em `src/lib/causas.ts`, com slug, nome, título da página, emoji, descrição e grupo.
+2. Pronto: ela aparece nos filtros, nos formulários, em "Como funciona" e ganha a página `/causas/slug`, que entra no sitemap quando tiver negócios.
 
 Para trocar o slug de uma causa existente, crie uma migração que atualize `EmpresaCausa`.
+
+### Trocar o logo ou o ícone
+
+1. Atualize `src/lib/marca.ts`: `ICONE` para o ícone, `TEXTO_DO_LOGO` para o texto e `CORES_DA_MARCA` para as cores. Se as cores mudarem, mude também as `--color-marca-*` de `globals.css`.
+2. Rode `npm run marca:icones`. Ele gera de novo o favicon, o ícone do iPhone e os ícones do manifest.
+3. Confira a imagem geral (`/opengraph-image`) e a de um perfil (`/empresas/<@>/opengraph-image`) com `next build && next start`. Em `next dev`, um erro na imagem só aparece no terminal.
+4. Faça commit dos arquivos gerados.
+
+### Cadastrar o site no Google e no Bing
+
+1. No [Google Search Console](https://search.google.com/search-console), adicione uma propriedade do tipo "Prefixo do URL" com o endereço de produção e escolha a verificação por **tag HTML**.
+2. Copie só o valor do `content` para a variável `GOOGLE_SITE_VERIFICATION`, só em Production no Vercel. Ela é lida no build, então entra no próximo deploy de produção.
+3. Depois de verificar, envie o sitemap: `https://<domínio>/sitemap.xml`.
+4. No [Bing Webmaster Tools](https://www.bing.com/webmasters), importe a propriedade do Search Console ou use a meta tag, com o código em `BING_SITE_VERIFICATION`. O índice do Bing também alimenta a busca do ChatGPT e de outros assistentes.
 
 ### Acrescentar um campo ao negócio
 
@@ -529,7 +594,13 @@ Para trocar o slug de uma causa existente, crie uma migração que atualize `Emp
 
 1. Rode `npm run municipios:atualizar`. O script `scripts/municipios-ibge.ts` baixa a lista do IBGE e regrava `src/lib/municipios.json`.
 2. Confira no diff os municípios novos ou renomeados e rode `npm test`.
-3. Negócios de uma cidade renomeada continuam com o nome antigo até serem editados.
+3. Negócios de uma cidade renomeada continuam com o nome antigo até serem editados. O `npm run cidades:corrigir` lista esses negócios em "Fora da lista do IBGE".
+
+### Corrigir cidades escritas fora do padrão
+
+1. Rode `npm run cidades:corrigir`. Ele lista as cidades gravadas com outra grafia ("Sao Paulo" → São Paulo) e as que não estão na lista do IBGE, sem gravar nada.
+2. Confira a lista e rode de novo com `-- --aplicar` para gravar o nome oficial. Para a produção, passe a conexão do Neon na frente: `DATABASE_URL="postgresql://..." npm run cidades:corrigir -- --aplicar`.
+3. As cidades fora da lista do IBGE se corrigem uma a uma, editando o negócio pelo painel da moderação.
 
 ### Mudar uma regra da reivindicação
 
@@ -541,9 +612,16 @@ Para trocar o slug de uma causa existente, crie uma migração que atualize `Emp
 ### Criar uma ação de moderação
 
 1. Crie a Server Action em `src/acoes/moderacao.ts`, começando por `exigirModerador()`.
-2. Registre na auditoria com `registrarAuditoria`, com uma ação no formato `alvo.verbo` (por exemplo, `empresa.despublicada`).
-3. Volte para a aba certa com um aviso: `redirect("/moderacao?aba=…&aviso=feito")`.
+2. Registre na auditoria com `registrarAuditoria`, com uma ação no formato `alvo.verbo` (por exemplo, `empresa.despublicada`), e acrescente a descrição dela em `ACOES_AUDITORIA` (`src/lib/dominio.ts`).
+3. Volte para a aba certa com um aviso: `redirect("/moderacao?aba=…&aviso=feito")`. Se o botão fica numa lista com busca, filtro ou página, mande a lista num campo `voltar` e redirecione com `destinoNaModeracao` e `comAviso`, como em `moderarEmpresa`.
 4. Atualize a [tabela da auditoria](regras-de-negocio.md#13-auditoria).
+
+### Acrescentar um número ou uma lista ao painel da moderação
+
+1. Conte no banco em `src/lib/moderacao/indicadores.ts` (números da visão geral) ou consulte em `src/lib/moderacao/consultas.ts` (listas). Contas sempre com `select`, nunca com o hash da senha.
+2. Um filtro novo na URL entra em `src/lib/moderacao/filtros.ts`, numa lista de opções conhecidas, para `lerFiltros` recusar o resto.
+3. Mostre na tela com as peças de `src/app/moderacao/Blocos.tsx` (`Numero`, `Detalhes`, `Colunas`, `Barras`, `Etiqueta`).
+4. Cubra a consulta em `tests/db/moderacao.test.ts` e descreva o número na [seção 2 das regras de negócio](regras-de-negocio.md#o-painel-da-moderação).
 
 ### Dar ou tirar a moderação
 
@@ -599,6 +677,9 @@ O PR só conflita se a `main` recebeu algo que não passou pela `stage`. Nesse c
 - **"User was denied access on the database"** quase sempre é o `DATABASE_URL` apontando para outro Postgres na porta 5432. O do Docker usa a **5433**. Veja os [problemas comuns do README](../README.md#problemas-comuns).
 - **O `next dev` reescreve o começo do `AGENTS.md`.** Escreva as regras do projeto **depois** do bloco que ele gerencia.
 - **Fotos no computador de quem desenvolve** ficam em `public/enviados/`, que está fora do Git. Os links delas não funcionam em outro computador.
+- **Imagens de compartilhamento (`ImageResponse`):**
+  - toda `div` com mais de um filho precisa de `display: "flex"`. Texto com variáveis como `{a} · {b}` vira vários filhos: use uma template string;
+  - o gerador não lê WebP, woff2 nem fonte variável. Por isso as fotos em WebP viram monograma na prévia, e as fontes ficam em TTF em `assets/fontes`.
 - **`BLOB_STORE_ID` sozinho no `.env`** faz o envio de fotos falhar: fora do Vercel não há OIDC. No seu computador, deixe as duas variáveis do Blob vazias ou use a `BLOB_READ_WRITE_TOKEN`.
 
 ---
@@ -618,14 +699,38 @@ E dois combinados que mantêm esta documentação útil:
 - **Mudou uma regra de negócio?** Atualize o [Regras de negócio](regras-de-negocio.md) no mesmo PR.
 - **Tomou uma decisão que muda o rumo do projeto?** Conte o porquê na descrição do PR e, se for uma decisão de fundo, aqui neste guia.
 
+## Issue #40 — Arquitetura da primeira entrega de serviços
 
-## Issue #40 — Primeira etapa: profissionais e serviços
+### Decisões
 
-- `PerfilProfissional` complementa `Usuario`, evitando contas duplicadas.
-- `Servico` aponta para `PerfilProfissional` **ou** `Empresa`; a constraint `Servico_prestador_check` na migração impede dois prestadores ou ausência de prestador.
-- As validações e o índice normalizado para busca estão em `src/lib/servicos.ts`.
-- As Server Actions estão em `src/acoes/servicos.ts` e conferem as permissões com sessão, vínculo de dono e papel de moderador.
-- O catálogo público fica em `/servicos`, o painel em `/painel/servicos` e a revisão de novos anúncios em `/moderacao/servicos`.
-- Esta entrega é o primeiro PR da issue #40; solicitações de orçamento, propostas e pagamentos ficam fora de escopo.
-- Interface mobile-first com grids responsivos; reutiliza as cores e tipografias definidas em `src/app/globals.css`, inclusive no modo escuro. Não introduz outra paleta.
-- `IconeRede` usa SVG leve e `SeletorModalidades` mantém checkboxes nativos e foco visível.
+A funcionalidade reaproveita `Usuario`, `Empresa`, `EmpresaMembro`, autenticação via sessão, auditoria e o design system da `stage`, sem criar contas paralelas.
+
+- `PerfilProfissional` é vinculado 1:1 a `Usuario`; `Servico` referencia um perfil ou uma empresa, nunca ambos. O Prisma descreve as relações e a migração PostgreSQL impõe os invariantes que o Prisma não representa em seu schema.
+- `src/lib/servicos.ts` concentra validação Zod e funções puras, seguras para importar em Client Components.
+- `src/lib/servicos/permissoes.ts` é **server-only** e centraliza as decisões de acesso ao prestador e ao anúncio.
+- `src/lib/servicos/consultas.ts` é **server-only** e fornece o filtro público reutilizável com consulta paginada e ordenação estável.
+- `src/lib/servicos/transicoes.ts` documenta e testa as transições válidas entre estados.
+- `src/acoes/servicos.ts` autentica, valida os dados recebidos, chama as regras no banco numa transação e regista auditoria, mantendo redirecionamentos e revalidação das páginas fora da transação.
+- As páginas em `src/app/servicos`, `src/app/painel/servicos` e `src/app/moderacao/servicos` seguem a convenção do projeto de colocar acesso ao banco e à sessão dentro de `Suspense`.
+- `FormularioServico` é reutilizado para criar e rever anúncios. Revisões reenviam o anúncio à moderação; o prestador é imutável.
+
+### Moderação e privacidade
+
+O processo de aprovação verifica, no momento da decisão, que o prestador continua visível ou verificado. Uma rejeição exige motivo; o motivo fica restrito ao proprietário e à moderação. O filtro público nunca inclui anúncios pendentes ou rejeitados. Não se expõem e-mails de conta; somente o contato profissional fornecido voluntariamente.
+
+### Validação
+
+- `tests/unit/servicos.test.ts`: dados inválidos, tipos de prestador, requisitos para publicar perfis, motivo de rejeição, transições e paginação.
+- `tests/db/servicos.test.ts`: visibilidade pública, exclusividade do prestador, modalidades exigidas, propriedades e elegibilidade de empresa.
+- O teste de banco utiliza base de teste isolada, com limpeza apenas dos fixtures criados pela suite, evitando `TRUNCATE` indiscriminado.
+- Antes do merge: `npm run lint`, `npm run typecheck`, `npm test`, `npm run build`, migração numa base limpa e revisão visual em 375 px, 768 px e 1440 px, claro e escuro.
+
+### Escalabilidade e evolução
+
+A consulta usa texto de busca normalizado com `contains`. Foi mantida a mesma estratégia simples do diretório atual para este MVP; quando a quantidade de serviços exigir, avaliar busca indexada com `pg_trgm` ou índice de texto completo e medir planos com `EXPLAIN ANALYZE`. A pesquisa é limitada a seis termos para controlar custo. Transações e verificações de propriedade reduzem inconsistências; para concorrência elevada, considerar isolamento serializável com retry antes de introduzir fluxos transacionais adicionais.
+
+A migração da feature foi atualizada **antes de entrar em `stage`**. Quem já a aplicou localmente deve verificar o histórico de migrações e evitar reaplicação manual em bancos com dados; os testes devem usar um banco descartável separado.
+
+### Escopo futuro
+
+Pedidos de orçamento, denúncias, contratos, avaliações, histórico de serviços e pagamentos não estão nesta PR. Devem começar por regras de negócio discutidas na issue #40, com testes de autorização e moderação antes da UI.

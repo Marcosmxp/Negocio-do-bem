@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 import { IconeRede } from "@/components/IconeRede";
-import { db } from "@/lib/db";
-import { CATEGORIAS_SERVICOS, filtroServicosPublicos } from "@/lib/servicos";
+import { CATEGORIAS_SERVICOS } from "@/lib/servicos";
+import { listarServicosPublicos } from "@/lib/servicos/consultas";
 
 export const metadata: Metadata = {
   title: "Serviços da comunidade",
@@ -71,21 +71,7 @@ async function Lista({ searchParams }: Pick<PageProps<"/servicos">, "searchParam
   const params = await searchParams;
   const q = typeof params.q === "string" ? params.q.slice(0, 100) : "";
   const categoria = typeof params.categoria === "string" && CATEGORIAS_SERVICOS.some((c) => c === params.categoria) ? params.categoria : "";
-  const pagina = typeof params.pagina === "string" ? Math.min(100, Math.max(1, Number.parseInt(params.pagina, 10) || 1)) : 1;
-  const where = filtroServicosPublicos(q, categoria);
-  const [total, itens] = await Promise.all([
-    db.servico.count({ where }),
-    db.servico.findMany({
-      where,
-      include: {
-        perfil: { select: { nomePublico: true, emailContato: true, site: true } },
-        empresa: { select: { nome: true, instagramUsername: true } },
-      },
-      orderBy: { criadoEm: "desc" },
-      skip: (pagina - 1) * 18,
-      take: 18,
-    }),
-  ]);
+  const { total, itens, pagina, paginas } = await listarServicosPublicos({ q, categoria, pagina: params.pagina });
 
   function endereco(p: number) {
     const qs = new URLSearchParams();
@@ -187,7 +173,7 @@ async function Lista({ searchParams }: Pick<PageProps<"/servicos">, "searchParam
         <nav aria-label="Paginação de serviços" className="mt-8 flex flex-wrap items-center justify-center gap-3">
           {pagina > 1 && <Link className="botao-claro min-h-11" href={endereco(pagina - 1)}><IconeRede nome="voltar" className="h-4 w-4" /> Anterior</Link>}
           <span className="inline-flex min-h-11 items-center text-sm text-suave">Página {pagina}</span>
-          {pagina * 18 < total && <Link className="botao-claro min-h-11" href={endereco(pagina + 1)}>Próxima <IconeRede nome="seta" className="h-4 w-4" /></Link>}
+          {pagina < paginas && <Link className="botao-claro min-h-11" href={endereco(pagina + 1)}>Próxima <IconeRede nome="seta" className="h-4 w-4" /></Link>}
         </nav>
       )}
     </section>

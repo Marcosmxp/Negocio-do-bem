@@ -7,8 +7,9 @@ import { exigirUsuario } from "@/lib/auth/sessao";
 import { db } from "@/lib/db";
 import { METODOS_REIVINDICACAO, MODERACAO_EMPRESA, STATUS_REIVINDICACAO } from "@/lib/dominio";
 import { formatarData } from "@/lib/texto";
+import { FORA_DA_BUSCA } from "@/lib/seo";
 
-export const metadata: Metadata = { title: "Meu painel" };
+export const metadata: Metadata = { title: "Meu painel", robots: FORA_DA_BUSCA };
 
 export default function Painel() {
   return (
@@ -58,6 +59,13 @@ async function Conteudo() {
   return (
     <div className="mt-2 space-y-12">
       <p className="text-suave">Olá, {usuario.nome.split(" ")[0]}! Aqui você cuida dos seus negócios e acompanha suas indicações.</p>
+      <section className="cartao flex flex-col gap-3 border-folha/25 bg-folha-50 p-5 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="font-serif text-xl font-semibold">Meus serviços</h2>
+          <p className="mt-1 text-sm text-suave">Cadastre seu perfil profissional e ofereça serviços à comunidade.</p>
+        </div>
+        <Link href="/painel/servicos" className="botao-coral min-h-11 shrink-0">Gerenciar serviços</Link>
+      </section>
 
       <section>
         <h2 className="font-serif text-2xl font-semibold">Meus negócios</h2>

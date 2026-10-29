@@ -2,88 +2,90 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 import { moderarServico } from "@/acoes/servicos";
+import { BotaoEnviar } from "@/components/BotaoEnviar";
 import { IconeRede } from "@/components/IconeRede";
+import { Paginacao } from "@/components/Paginacao";
 import { exigirModerador } from "@/lib/auth/sessao";
 import { db } from "@/lib/db";
+import { limitarPagina, numeroPagina } from "@/lib/servicos";
+
+const POR_PAGINA = 30;
 
 export const metadata: Metadata = { title: "Moderar serviços", robots: { index: false } };
 
-export default function ModeracaoServicos() {
+export default function ModeracaoServicos(props: PageProps<"/moderacao/servicos">) {
   return (
     <div className="mx-auto w-full max-w-5xl px-4 pt-8 sm:px-6 sm:pt-12">
-      <nav aria-label="Você está em" className="mb-7 flex items-center gap-2 text-sm text-suave">
-        <Link href="/moderacao" className="inline-flex items-center gap-2 font-medium text-coral-700 hover:underline">
-          <IconeRede nome="voltar" className="h-4 w-4" /> Moderação
-        </Link>
-        <span aria-hidden="true">/</span>
-        <span>Serviços</span>
+      <nav aria-label="Você está em" className="mb-7 text-sm">
+        <Link href="/moderacao" className="link">← Moderação</Link>
       </nav>
-      <span className="inline-flex items-center gap-2 rounded-full bg-folha-50 px-3 py-1.5 text-xs font-semibold text-folha">
-        <IconeRede nome="seguro" className="h-4 w-4" /> Moderação da comunidade
-      </span>
-      <h1 className="mt-4 font-serif text-4xl font-semibold tracking-tight sm:text-5xl">Analisar anúncios</h1>
-      <p className="mt-3 max-w-2xl text-sm leading-relaxed text-suave sm:text-base">Verifique os dados e a descrição de cada serviço antes de disponibilizá-lo à comunidade.</p>
-      <Suspense fallback={<div className="mt-8 h-80 animate-pulse rounded-3xl bg-superficie" />}><Conteudo /></Suspense>
+      <h1 className="font-serif text-4xl font-semibold tracking-tight">Analisar anúncios de serviços</h1>
+      <p className="mt-3 max-w-2xl text-sm leading-relaxed text-suave">
+        Os anúncios só entram no catálogo após a revisão. Informe o motivo ao recusar.
+      </p>
+      <Suspense fallback={<div className="mt-8 h-80 animate-pulse rounded-3xl bg-superficie" />}>
+        <Conteudo searchParams={props.searchParams} />
+      </Suspense>
     </div>
   );
 }
 
-async function Conteudo() {
+async function Conteudo({ searchParams }: Pick<PageProps<"/moderacao/servicos">, "searchParams">) {
   await exigirModerador();
+  const params = await searchParams;
+  const total = await db.servico.count({ where: { status: "pendente" } });
+  const { pagina, paginas } = limitarPagina(numeroPagina(params.pagina), total, POR_PAGINA);
   const pendentes = await db.servico.findMany({
     where: { status: "pendente" },
-    include: { perfil: { select: { nomePublico: true } }, empresa: { select: { nome: true } } },
-    orderBy: { criadoEm: "asc" }, take: 50,
+    select: {
+      id: true, titulo: true, descricao: true, categoria: true,
+      cidade: true, uf: true, remoto: true, presencial: true, precoReferencia: true,
+      perfil: { select: { nomePublico: true } }, empresa: { select: { nome: true } },
+    },
+    orderBy: [{ criadoEm: "asc" }, { id: "asc" }], skip: (pagina - 1) * POR_PAGINA, take: POR_PAGINA,
   });
   return (
-    <section aria-labelledby="pendentes" className="mt-8 space-y-4">
-      <div className="flex flex-wrap items-end justify-between gap-3 border-b border-linha pb-4">
-        <h2 id="pendentes" className="font-serif text-2xl font-semibold sm:text-3xl">Aguardando revisão</h2>
-        <span className="rounded-full bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-800">{pendentes.length} pendentes</span>
-      </div>
+    <section className="mt-8 space-y-5">
+      {params.aviso === "dados_invalidos" && <p role="alert" className="text-coral-700">Informe um motivo válido para recusar.</p>}
+      {params.aviso === "indisponivel" && <p role="alert" className="text-coral-700">O anúncio já foi analisado ou o prestador não pode publicá-lo.</p>}
+      <p className="text-sm text-suave">{total} {total === 1 ? "anúncio pendente" : "anúncios pendentes"}</p>
       {pendentes.length === 0 ? (
-        <div className="cartao flex flex-col items-center px-6 py-12 text-center">
-          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-folha-50 text-folha"><IconeRede nome="verificar" className="h-7 w-7" /></div>
-          <h3 className="mt-5 font-serif text-2xl font-semibold">Tudo em dia</h3>
-          <p className="mt-2 text-sm text-suave">Nenhum anúncio de serviço aguardando análise.</p>
-        </div>
+        <p className="cartao p-8 text-center text-suave">Nenhum anúncio aguardando análise.</p>
       ) : (
         <div className="grid gap-4">
           {pendentes.map((servico) => (
-            <article className="cartao min-w-0 overflow-hidden p-5 sm:p-7" key={servico.id}>
-              <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
+            <article className="cartao min-w-0 space-y-4 p-5 sm:p-7" key={servico.id}>
+              <header className="flex flex-col justify-between gap-3 sm:flex-row">
                 <div>
-                  <span className="rounded-full bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-800">Aguardando análise</span>
-                  <h3 className="mt-4 break-words font-serif text-2xl font-semibold leading-tight">{servico.titulo}</h3>
-                  <p className="mt-2 inline-flex items-center gap-2 text-sm font-medium">
-                    <IconeRede nome={servico.empresa ? "empresa" : "pessoa"} className="h-4 w-4 text-suave" />
-                    {servico.perfil?.nomePublico ?? servico.empresa?.nome}
-                  </p>
+                  <h2 className="font-serif text-2xl font-semibold">{servico.titulo}</h2>
+                  <p className="text-sm text-suave">{servico.perfil?.nomePublico ?? servico.empresa?.nome}</p>
                 </div>
-                <span className="text-xs text-suave sm:text-right">{servico.categoria}<span aria-hidden="true"> · </span>{servico.cidade}, {servico.uf}</span>
-              </div>
-              <p className="mt-5 whitespace-pre-wrap break-words rounded-2xl bg-papel/70 p-4 text-sm leading-relaxed text-suave sm:p-5">{servico.descricao}</p>
-              <div className="mt-4 flex flex-wrap gap-2 text-xs text-suave">
-                {servico.remoto && <span className="rounded-full bg-papel px-3 py-1.5">Remoto</span>}
-                {servico.presencial && <span className="rounded-full bg-papel px-3 py-1.5">Presencial</span>}
-                <span className="rounded-full bg-papel px-3 py-1.5">{servico.precoReferencia || "Sem preço definido"}</span>
-              </div>
-              <div className="mt-6 flex flex-col gap-3 border-t border-linha pt-5 sm:flex-row sm:justify-end">
-                {(["aprovar", "rejeitar"] as const).map((decisao) => (
-                  <form key={decisao} action={moderarServico} className="w-full sm:w-auto">
-                    <input type="hidden" name="id" value={servico.id} />
-                    <input type="hidden" name="decisao" value={decisao} />
-                    <button type="submit" className={`${decisao === "aprovar" ? "botao-coral" : "botao-claro"} min-h-11 w-full px-6 sm:w-auto`}>
-                      {decisao === "aprovar" ? <IconeRede nome="verificar" className="h-4 w-4" /> : <IconeRede nome="ocultar" className="h-4 w-4" />}
-                      {decisao === "aprovar" ? "Aprovar anúncio" : "Recusar anúncio"}
-                    </button>
-                  </form>
-                ))}
+                <span className="text-sm text-suave">{servico.categoria} · {servico.cidade}, {servico.uf}</span>
+              </header>
+              <p className="whitespace-pre-wrap break-words rounded-2xl bg-papel p-4 text-sm leading-relaxed">{servico.descricao}</p>
+              <p className="text-sm text-suave">
+                {servico.remoto && "Remoto"}{servico.remoto && servico.presencial && " · "}{servico.presencial && "Presencial"}
+                {servico.precoReferencia && ` · ${servico.precoReferencia}`}
+              </p>
+              <div className="grid gap-4 border-t border-linha pt-4 sm:grid-cols-2">
+                <form action={moderarServico} className="flex flex-col justify-end">
+                  <input type="hidden" name="id" value={servico.id} />
+                  <input type="hidden" name="decisao" value="aprovar" />
+                  <BotaoEnviar className="botao-coral min-h-11 w-full"><IconeRede nome="verificar" className="h-4 w-4" /> Aprovar anúncio</BotaoEnviar>
+                </form>
+                <form action={moderarServico} className="space-y-2">
+                  <input type="hidden" name="id" value={servico.id} />
+                  <input type="hidden" name="decisao" value="rejeitar" />
+                  <label htmlFor={`motivo-${servico.id}`} className="rotulo">Motivo da recusa</label>
+                  <textarea id={`motivo-${servico.id}`} name="motivo" required minLength={10} maxLength={500} rows={2} className="campo w-full" placeholder="Explique o que deve ser corrigido." />
+                  <BotaoEnviar className="botao-claro min-h-11 w-full">Recusar anúncio</BotaoEnviar>
+                </form>
               </div>
             </article>
           ))}
         </div>
       )}
+      <Paginacao atual={pagina} total={paginas} href={(p) => p === 1 ? "/moderacao/servicos" : `/moderacao/servicos?pagina=${p}`} />
     </section>
   );
 }

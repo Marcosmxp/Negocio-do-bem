@@ -5,12 +5,14 @@ import { alternarServico } from "@/acoes/servicos";
 import { FormularioPerfilProfissional } from "@/components/FormularioPerfilProfissional";
 import { FormularioServico } from "@/components/FormularioServico";
 import { IconeRede } from "@/components/IconeRede";
+import { Paginacao } from "@/components/Paginacao";
 import { exigirUsuario } from "@/lib/auth/sessao";
 import { db } from "@/lib/db";
+import { limitarPagina, numeroPagina } from "@/lib/servicos";
 
 export const metadata: Metadata = { title: "Meus serviços" };
 
-export default function MeusServicos() {
+export default function MeusServicos(props: PageProps<"/painel/servicos">) {
   return (
     <div className="mx-auto w-full max-w-6xl px-4 pt-8 sm:px-6 sm:pt-12">
       <nav aria-label="Você está em" className="mb-7 flex items-center gap-2 text-sm text-suave">
@@ -31,7 +33,7 @@ export default function MeusServicos() {
         </Link>
       </div>
       <Suspense fallback={<div className="mt-8 h-80 animate-pulse rounded-3xl bg-superficie" />}>
-        <Conteudo />
+        <Conteudo searchParams={props.searchParams} />
       </Suspense>
     </div>
   );
@@ -43,7 +45,7 @@ const ESTADOS: Record<string, { texto: string; classe: string }> = {
   rejeitado: { texto: "Não aprovado", classe: "bg-coral-50 text-coral-700" },
 };
 
-async function Conteudo() {
+async function Conteudo({ searchParams }: Pick<PageProps<"/painel/servicos">, "searchParams">) {
   const usuario = await exigirUsuario("/painel/servicos");
   const [perfil, membros] = await Promise.all([
     db.perfilProfissional.findUnique({ where: { usuarioId: usuario.id } }),
@@ -51,9 +53,15 @@ async function Conteudo() {
   ]);
   const empresas = membros.filter(({ empresa }) => empresa.status === "verificada" && empresa.moderacao === "aprovada" && !empresa.oculta)
     .map(({ empresa }) => ({ id: empresa.id, nome: empresa.nome }));
+  const where = { OR: [{ perfilUsuarioId: usuario.id }, { empresaId: { in: membros.map(({ empresaId }) => empresaId) } }] };
+  const total = await db.servico.count({ where });
+  const params = await searchParams;
+  const { pagina, paginas } = limitarPagina(numeroPagina(params.pagina), total, 20);
   const servicos = await db.servico.findMany({
-    where: { OR: [{ perfilUsuarioId: usuario.id }, { empresaId: { in: membros.map(({ empresaId }) => empresaId) } }] },
-    orderBy: { criadoEm: "desc" }, take: 100,
+    where,
+    orderBy: [{ criadoEm: "desc" }, { id: "desc" }],
+    skip: (pagina - 1) * 20,
+    take: 20,
   });
   return (
     <div className="mt-8 space-y-10">
@@ -78,7 +86,7 @@ async function Conteudo() {
             <p className="text-xs font-semibold tracking-widest text-coral-700 uppercase">Acompanhamento</p>
             <h2 id="meus-anuncios" className="mt-1 font-serif text-2xl font-semibold sm:text-3xl">Meus anúncios</h2>
           </div>
-          <span className="rounded-full bg-superficie px-3 py-1.5 text-xs font-semibold text-suave ring-1 ring-linha">{servicos.length} {servicos.length === 1 ? "serviço" : "serviços"}</span>
+          <span className="rounded-full bg-superficie px-3 py-1.5 text-xs font-semibold text-suave ring-1 ring-linha">{total} {total === 1 ? "serviço" : "serviços"}</span>
         </div>
         {servicos.length === 0 ? (
           <div className="cartao flex flex-col items-center px-6 py-12 text-center">
@@ -100,6 +108,16 @@ async function Conteudo() {
                     <h3 className="mt-4 break-words font-serif text-xl font-semibold leading-tight">{servico.titulo}</h3>
                     <p className="mt-2 text-xs text-suave">{servico.categoria} · {servico.cidade}, {servico.uf}</p>
                   </div>
+                  {servico.status === "rejeitado" && servico.motivoRecusa && (
+                    <p role="status" className="rounded-xl bg-coral-50 p-3 text-sm text-coral-700">
+                      Motivo da recusa: {servico.motivoRecusa}
+                    </p>
+                  )}
+                  <div className="flex flex-wrap gap-2">
+                    <Link href={`/painel/servicos/${servico.id}`} className="botao-coral min-h-11 w-full sm:w-auto">
+                      Editar anúncio
+                    </Link>
+                  </div>
                   <form action={alternarServico}>
                     <input type="hidden" name="id" value={servico.id} />
                     <input type="hidden" name="oculto" value={servico.oculto ? "nao" : "sim"} />
@@ -114,6 +132,7 @@ async function Conteudo() {
           </div>
         )}
       </section>
+      <Paginacao atual={pagina} total={paginas} href={(p) => p === 1 ? "/painel/servicos" : `/painel/servicos?pagina=${p}`} />
     </div>
   );
 }

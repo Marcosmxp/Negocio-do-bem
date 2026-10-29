@@ -81,14 +81,77 @@ Um papel não exclui o outro: uma pessoa da moderação também pode ser dona de
 | **Visitante** | Sem login | Ver o diretório, os perfis publicados e os depoimentos. Não indica, não escreve depoimento, não reivindica. |
 | **Membro** | Qualquer conta | Indicar negócios, escrever depoimentos, denunciar depoimentos, reivindicar um negócio, ver as próprias indicações e solicitações em `/painel`. |
 | **Dono** | Conta aprovada como dona de um negócio | Tudo do membro, mais: editar o perfil do próprio negócio, trocar a foto, responder depoimentos e ocultar ou mostrar o negócio no diretório. Não pode escrever depoimento no próprio negócio. |
-| **Moderação** | `papel = "moderador"` no banco | Tudo do membro, mais: as filas de `/moderacao`, tirar do ar e publicar de novo qualquer negócio, editar qualquer perfil, ver a auditoria. |
+| **Moderação** | `papel = "moderador"` no banco | Tudo do membro, mais: o painel de `/moderacao` (visão geral, filas, todos os negócios, contas e depoimentos, auditoria e sistema), tirar do ar e publicar de novo qualquer negócio, editar qualquer perfil. |
 
 Detalhes da moderação:
 
 - **Só o papel no banco dá moderação.** O cadastro não confirma o e-mail, então o e-mail nunca dá acesso: se desse, quem se cadastrasse primeiro com o endereço certo levaria a moderação.
 - Quem cuida do projeto dá e tira a moderação com `npm run moderacao`, que roda com a conexão direta do banco e registra na auditoria. Vale a partir da próxima página aberta, sem precisar sair e entrar.
-- Para quem não é moderação, `/moderacao` e `/moderacao/negocios/<@>` respondem 404: a área simplesmente não existe.
+- Para quem não é moderação, `/moderacao`, `/moderacao/negocios/<@>` e `/moderacao/contas/<id>` respondem 404: a área simplesmente não existe.
 - A moderação **não** responde depoimentos nem oculta negócios dos outros. Isso é só do dono.
+- A moderação **não** dá nem tira a moderação pela tela, não suspende nem apaga contas: o painel só consulta.
+
+### O painel da moderação
+
+Código: `src/app/moderacao/` (telas) e `src/lib/moderacao/` (filtros da URL, indicadores e consultas).
+
+O painel tem um menu com quatro grupos. No celular, ele vira uma linha que rola para o lado.
+
+| Grupo | Seção | O que mostra |
+| --- | --- | --- |
+| Painel | **Visão geral** (abre primeiro) | As filas que esperam a moderação, os números do projeto, a atividade das últimas semanas, o diretório por estado, tipo e causa, e a saúde dos dados. |
+| Filas | **Reivindicações**, **Indicações**, **Denúncias** | As filas que já existiam ([seções 5](#5-moderação-das-indicações), [6](#a-decisão-da-moderação) e [10](#denúncias)). O menu mostra quantos itens esperam em cada uma. |
+| Cadastros | **Negócios** | Todos os negócios, com filtros por situação ([seção 5](#editar-qualquer-perfil)). |
+| Cadastros | **Contas** | Todas as contas, com busca e filtros, e a ficha de cada uma. |
+| Cadastros | **Depoimentos** | Todos os depoimentos, publicados e removidos. |
+| Registros | **Auditoria** | Quem fez o quê, com filtros ([seção 13](#13-auditoria)). |
+| Registros | **Sistema** | O ambiente, as integrações ligadas, as tabelas e as migrações do banco. |
+
+**Visão geral:**
+
+- **Filas:** um cartão por fila com itens esperando. Sem nada esperando, aparece "Nenhuma fila esperando a moderação".
+- **Números do projeto:** contam tudo o que está no banco, inclusive o que o público não vê:
+  - negócios no diretório e cadastrados, verificados, sem dono, tirados do ar, ocultos pelo dono e indicados nos últimos 7 dias;
+  - contas cadastradas, donas de negócio, de moderação, com sessão aberta, sem atividade e criadas nos últimos 7 dias;
+  - depoimentos publicados, com e sem resposta do dono, com denúncia aberta, removidos e escritos nos últimos 7 dias;
+  - pedidos de reivindicação aprovados, recusados, em análise, e cancelados ou expirados.
+
+  Cada número leva à lista filtrada, quando ela existe.
+- **Atividade:** negócios indicados, contas criadas, depoimentos e pedidos em cada uma das últimas 12 semanas. Cada semana são 7 dias corridos até o momento da consulta, então a última não fica pela metade. Ao passar o mouse, cada coluna mostra o total e as datas. "Ver os números de cada semana" abre a mesma informação em tabela.
+- **O diretório:** os negócios que o público vê, por estado, por tipo e por causa. Aparecem os 8 maiores de cada lista, e os links abrem as páginas públicas.
+- **Saúde dos dados:**
+  - negócios do diretório sem foto, sem nenhum contato (site, WhatsApp ou e-mail) e sem história;
+  - cidades gravadas com um nome diferente do oficial do IBGE naquela UF, como "Sao Paulo" (ver [seção 12](#municípios)), com o nome oficial ao lado ("fora da lista" quando não há) e quantos negócios há em cada uma. O `npm run cidades:corrigir` grava os nomes oficiais;
+  - pedidos em análise com o prazo vencido;
+  - sessões vencidas que continuam no banco.
+
+  Zero aparece como "tudo certo"; acima de zero, com um link para a lista.
+
+**Contas:**
+
+- **A lista** mostra nome, e-mail, se é moderação, quando a conta foi criada, desde quando tem sessão aberta e quantos negócios, indicações, depoimentos e pedidos ela tem. As mais novas aparecem primeiro, 30 por página.
+- **A busca** procura no nome e no e-mail. Cada palavra precisa aparecer, sem diferenciar maiúsculas. Acentos contam: "joao" não acha "João".
+- **Filtros:** todas, moderação, donos de negócio, novas (criadas nos últimos 7 dias) e sem atividade (não indicaram, não escreveram depoimento nem denúncia, não pediram e não são donas de nenhum negócio).
+- **A ficha da conta** (`/moderacao/contas/<id>`) junta:
+  - nome, e-mail, papel, quando a conta foi criada e as sessões abertas;
+  - os negócios de que é dona, as indicações, os depoimentos, as denúncias e os pedidos de reivindicação, até 30 de cada, os mais recentes primeiro, com o total quando há mais;
+  - quantos pedidos decidiu, se é moderação;
+  - os 20 registros mais recentes da auditoria feitos por ela ou sobre a conta dela, com um link para todos.
+- **Sessão aberta** é uma sessão que ainda não venceu. Como "Sair" apaga a sessão, a ficha não sabe quando alguém entrou pela última vez.
+- **Denúncias da ficha:** só ficam guardadas as abertas e as que levaram à remoção. Quando a moderação mantém o depoimento, a denúncia é apagada ([seção 10](#denúncias)).
+- Os nomes das pessoas nas filas, nos negócios, nos depoimentos e na auditoria levam à ficha.
+
+**Depoimentos:** todos, dos mais novos aos mais antigos, 30 por página.
+
+- Filtros: publicados, com denúncia aberta, removidos e sem resposta do dono.
+- A busca procura no texto, no nome do autor e no nome do negócio, sem diferenciar maiúsculas.
+- A aba só consulta: a decisão sobre uma denúncia continua na fila "Denúncias", com o link "Decidir na fila".
+
+**Sistema:**
+
+- **Ambiente:** o nome (`production`, `preview` ou `development`), o endereço público, se os buscadores podem indexar e, no Vercel, o branch, o commit e a região.
+- **Integrações:** só se cada uma está ligada (fotos no Vercel Blob, código por DM, Entrar com Instagram, confirmação automática da DM, rotina de fotos, Google Analytics e verificação nos buscadores), com o que falta para ligar. Os valores das variáveis nunca aparecem.
+- **Banco:** quantas linhas cada tabela tem e as migrações aplicadas, da mais nova para a mais antiga. Uma migração que começou e não terminou aparece em destaque, porque trava o próximo deploy.
 
 ---
 
@@ -223,9 +286,10 @@ Código: `moderarEmpresa` e `publicarIndicacoesPendentes` em `src/acoes/moderaca
 
 Código: aba "Negócios" e `src/app/moderacao/negocios/[usuario]/page.tsx`.
 
-- **A aba "Negócios"** lista todos os negócios, publicados, pendentes, fora do ar e ocultos, com foto, cidade, situação na moderação, se tem dono e os botões "Editar perfil" e "Tirar do ar" (ou "Publicar de novo").
-  - A busca usa os mesmos campos da busca do diretório.
-  - Sem busca, a lista mostra os 50 atualizados mais recentemente.
+- **A aba "Negócios"** lista todos os negócios, publicados, pendentes, fora do ar e ocultos, dos atualizados mais recentemente aos mais antigos, 30 por página. Cada um mostra foto, @, tipo, cidade, quantos depoimentos publicados tem, os donos, quem indicou e quando, a situação ("No diretório", "Oculto pelo dono", "Fora do ar", "Aguardando moderação" e "Verificado") e os botões "Editar perfil", "Histórico" (a auditoria do negócio) e "Tirar do ar" (ou "Publicar de novo").
+  - A busca usa os mesmos campos da busca do diretório e aceita o @ com a arroba.
+  - **Filtros:** no diretório, tirados do ar, ocultos pelo dono, aguardando moderação, verificados, sem dono e, entre os do diretório, sem foto, sem contato e sem história.
+  - Depois de "Tirar do ar" ou "Publicar de novo", a moderação volta para a mesma lista, com a busca, o filtro e a página. O endereço de volta só é aceito se for da própria moderação (`destinoNaModeracao`).
 - **Edição:** `/moderacao/negocios/<@>` usa o **mesmo formulário do painel do dono**: foto, informações, contatos, causas e história.
   - Um aviso lembra que a edição é pela moderação e que fica registrada.
   - Se o negócio tem dono, o aviso pede para mudar só o necessário.
@@ -445,6 +509,18 @@ Para todo o resto, a página responde 404. Quem pode ver encontra um aviso no to
 - **rejeitado:** a mesma frase, começando com "Não publicada";
 - **oculto:** "Este perfil está oculto pelo dono e não aparece no diretório."
 
+### Buscadores e prévia do link
+
+Código: `src/app/sitemap.ts`, `src/app/robots.ts`, `src/lib/seo.ts` e `src/app/empresas/[usuario]/opengraph-image.tsx`.
+
+- **Só perfis do diretório vão para os buscadores.** O sitemap lista os negócios aprovados e não ocultos, lido do banco a cada pedido: um negócio aprovado entra na hora, e um oculto sai na hora. Ele também lista as páginas de cidade, causa e tipo que têm negócios (ver [seção 11](#páginas-de-cidade-causa-e-tipo)).
+- **Título do perfil na busca:** "Nome — Categoria em Cidade, UF". Na categoria "Outros", só "Nome em Cidade, UF". A descrição é o resumo.
+- **Dados estruturados:** o perfil público leva a ficha do negócio (`LocalBusiness`) com nome, resumo, foto, cidade, UF, WhatsApp, e-mail, Instagram, site, categoria e causas. São os mesmos dados que a página já mostra. O caminho até o perfil passa pela página da cidade: "Início › Recife, PE › Padaria Florescer".
+- **Prévia do link** (WhatsApp, Instagram, LinkedIn…): foto ou monograma, nome, categoria, cidade, até três causas e o selo "Verificado pelo dono". Uma foto em WebP vira monograma, porque o gerador da imagem não lê WebP.
+- **Perfil fora do diretório:** para quem pode vê-lo, a página leva `noindex`. A prévia do link é a geral do site, sem dados do negócio.
+- **Fora da busca:** login, cadastro, painel, reivindicação e moderação levam `noindex`. `/painel`, `/moderacao` e `/api/` também ficam bloqueados no `robots.txt`.
+- **Previews do Vercel** bloqueiam todos os robôs no `robots.txt`. Só a produção entra no índice.
+
 ### Painel do dono
 
 Código: `src/app/painel/`.
@@ -610,6 +686,7 @@ Código: filtros e "Onde?" em `src/lib/diretorio.ts`, consultas em `src/lib/cons
   - cada palavra digitada precisa aparecer, e só valem as 6 primeiras palavras e os 100 primeiros caracteres.
 - **"Onde?":**
   - sugere os estados e as cidades que já têm negócios, com quantos há em cada um. Sem texto, mostra "Todo o Brasil" e as cidades com mais negócios;
+  - junta a mesma cidade escrita de jeitos diferentes no banco ("Florianopolis" e "Florianópolis"), sem diferenciar acentos, maiúsculas, espaços, hífen e apóstrofo ("São João del-Rei" e "São João del Rei"), e com a UF da própria cidade grudada no fim ("Tubarão-SC"). Ela aparece uma vez só, com o nome oficial do IBGE e o total de todas as grafias, e o filtro acha os negócios de todas elas. Fora da lista do IBGE, vale a grafia mais usada;
   - aceita um estado ("PE", "Pernambuco" ou "Pernambuco (estado)"), "Cidade, UF" ou só o nome da cidade, sem diferenciar acentos e maiúsculas;
   - um nome que é de estado e de cidade (São Paulo) sem a UF vale como estado, que inclui a cidade;
   - um nome de cidade que existe em vários estados, sem a UF, vale para todos eles;
@@ -623,6 +700,37 @@ Código: filtros e "Onde?" em `src/lib/diretorio.ts`, consultas em `src/lib/cons
 - **Grade ou lista:** a lista mostra um negócio por linha, com resumo, categoria e cidade.
 - **Paginação:** 18 negócios por página, até a página 500, com os números das páginas. Com mais de 7 páginas, aparecem a primeira, a última e as vizinhas da atual.
 - **Os filtros ficam na URL** (`/explorar?q=…&onde=…&tipo=…&causa=…&verificados=sim&ordem=…&vista=lista&pagina=…`), então dá para compartilhar uma busca. O tipo vai como slug (`cafe-e-padaria`). Links antigos com `?uf=PE` viram "Pernambuco (estado)".
+- **Com qualquer filtro, o endereço canônico continua `/explorar`:** as combinações de filtros não entram na busca do Google. Quem busca por cidade, causa ou tipo cai nas páginas fixas abaixo.
+
+### Páginas de cidade, causa e tipo
+
+Código: `src/app/cidades/`, `src/app/causas/[causa]/`, `src/app/tipos/[tipo]/`, o componente `src/components/Vitrine.tsx`, os endereços em `src/lib/diretorio.ts` e as consultas `cidadeDoSlug` e `cidadesCom` em `src/lib/consultas.ts`.
+
+São as páginas que respondem às buscas mais comuns, como "negócios do bem em Salvador" ou "negócios liderados por mulheres".
+
+| Página | Endereço | Título |
+| --- | --- | --- |
+| Cidade | `/cidades/salvador-ba` | "Negócios do bem em Salvador, BA" |
+| Todas as cidades | `/cidades` | "Negócios do bem por cidade", agrupadas por estado |
+| Causa | `/causas/opcoes-veganas` (o slug da causa) | o título da causa, como "Negócios com opções veganas" |
+| Tipo | `/tipos/cafe-e-padaria` (o slug do tipo) | "Negócios de café e padaria" |
+
+- **Mostram** um texto de introdução, quantos negócios há, os 18 primeiros na ordem padrão do diretório (verificados primeiro) e "Ver todos os N no diretório" quando há mais. "Filtrar no diretório" abre o `/explorar` com o mesmo filtro.
+- **Links para continuar:**
+  - na cidade: os tipos e as causas que existem nela, que abrem o diretório com a cidade e aquele filtro, e as outras cidades do mesmo estado;
+  - na causa: as cidades e os tipos que têm a causa, que abrem o diretório com os dois filtros, e as outras causas do mesmo grupo;
+  - no tipo: as cidades e as causas desse tipo, que abrem o diretório com os dois filtros, e os outros tipos.
+- **A cidade vai pelo nome oficial do IBGE,** como no "Onde?". O endereço não tem acento nem maiúscula, e a UF vai no final. Grafias diferentes da mesma cidade ("Sao Paulo", "São Paulo", "Tubarão-SC") levam à mesma página, inclusive pelos links do perfil e do sitemap. Nas listas de cidades de uma causa ou de um tipo, elas contam juntas. Uma cidade fora da lista do IBGE fica com a grafia mais usada.
+- **Cidade sem negócios no diretório** mostra "Não encontramos esta página", com `noindex`. Isso inclui cidades que só têm negócios pendentes, rejeitados ou ocultos. Endereço de causa ou tipo que não existe, e o `/tipos/outros`, também.
+  - Como no perfil, o status HTTP é 200: o Next já mandou o começo da página quando descobre que ela não existe. Para os buscadores, o `noindex` basta.
+- **Causa ou tipo sem negócios:** a página existe, com um convite para indicar, mas leva `noindex` e fica fora do sitemap.
+- **"Outros" não tem página:** não diz nada para quem busca.
+- **Quem chega às páginas:**
+  - o perfil público liga o tipo, a cidade e cada causa às suas páginas;
+  - a página inicial mostra as 12 cidades com mais negócios, em "Explore por cidade";
+  - "Como funciona" liga cada causa à sua página;
+  - o rodapé tem "Negócios por cidade";
+  - o sitemap e o `llms.txt` listam as páginas.
 
 ---
 
@@ -640,7 +748,7 @@ A lista é fixa no código, em três grupos:
 | **Diversidade e respeito** | Antirracista (`antirracista`), Afroempreendedor (`afroempreendedor`), LGBTQIA+ friendly (`lgbtqia`), Liderado por mulheres (`liderado-por-mulheres`), Acessível (`acessivel`), Empreendimento indígena (`indigena`) |
 | **Comunidade e planeta** | Pet friendly (`pet-friendly`), Sustentável (`sustentavel`), Opções veganas (`opcoes-veganas`), Agricultura familiar (`agricultura-familiar`), Negócio de bairro (`negocio-de-bairro`), Apoia projetos sociais (`apoia-projetos-sociais`), Economia solidária (`economia-solidaria`) |
 
-Cada causa tem nome, emoji, descrição e grupo. A página "Como funciona" lista todas com a descrição.
+Cada causa tem nome, título da página (como "Negócios com opções veganas"), emoji, descrição e grupo. A página "Como funciona" lista todas com a descrição, e cada uma tem a sua página em `/causas/slug`.
 
 Regras:
 
@@ -677,6 +785,7 @@ A cidade vem da lista de municípios do IBGE, gravada no projeto em `src/lib/mun
 - **O formulário envia "Cidade, UF".** O servidor também aceita "Cidade/UF", "Cidade - UF" e só o nome, quando ele não se repete em outro estado. Assim o formulário funciona antes do JavaScript carregar.
 - **Recusas:** cidade em branco ("Em que cidade fica?"), nome que existe em mais de um estado sem a UF ("Existe mais de uma cidade chamada…") e nome fora da lista ("Escolha a cidade na lista. Se ela não aparecer, confira a grafia.").
 - **Grava o nome oficial:** quem digita "niteroi" e sai do campo fica com "Niterói, RJ".
+- **Cadastros de antes da lista** podem ter a cidade escrita de outro jeito ("Sao Paulo"). O `npm run cidades:corrigir` (`scripts/corrigir-cidades.ts`) mostra essas cidades e, com `--aplicar`, grava o nome oficial. Ele refaz o texto da busca do negócio e não muda a data de atualização, que ordena o diretório. As cidades que não estão na lista aparecem para a moderação corrigir pelo painel.
 - **A lista é atualizada à mão,** com `npm run municipios:atualizar`, quando o IBGE criar ou renomear um município.
 
 ---
@@ -685,7 +794,13 @@ A cidade vem da lista de municípios do IBGE, gravada no projeto em `src/lib/mun
 
 Código: `src/lib/auditoria.ts`.
 
-Toda decisão e edição importante grava quem fez, o quê, em qual alvo e quando. A aba "Auditoria" mostra os 100 registros mais recentes. "Sistema" aparece quando a ação foi automática, por exemplo uma aprovação pelo webhook.
+Toda decisão e edição importante grava quem fez, o quê, em qual alvo e quando. "Sistema" aparece quando a ação foi automática, por exemplo uma aprovação pelo webhook.
+
+A aba "Auditoria" do painel mostra os registros do mais novo ao mais antigo, 50 por página:
+
+- cada ação aparece com uma descrição em português (`ACOES_AUDITORIA`, em `src/lib/dominio.ts`) e com o código embaixo;
+- quem fez leva à ficha da conta, e o alvo leva ao negócio, à conta ou ao perfil do depoimento, enquanto ele existir. Alvo apagado aparece como "removido";
+- **filtros:** por ação (a lista mostra quantas vezes cada uma aparece), por quem fez (inclusive "sistema") e por alvo. O link "histórico" de cada linha, o "Histórico" da aba Negócios e o "Tudo o que esta conta fez" da ficha usam esses filtros.
 
 | Ação registrada | Quando |
 | --- | --- |
@@ -708,7 +823,7 @@ O que **não** vai para a auditoria hoje:
 - depoimentos, respostas e denúncias;
 - envio de fotos da história.
 
-Para uma ação nova de moderação, registre sempre na auditoria.
+Para uma ação nova de moderação, registre sempre na auditoria e dê a ela uma descrição em `ACOES_AUDITORIA`.
 
 ---
 
@@ -719,9 +834,9 @@ Para uma ação nova de moderação, registre sempre na auditoria.
 | Dado | Onde | Quem vê |
 | --- | --- | --- |
 | Nome da conta | `Usuario` | **Público** quando a pessoa escreve um depoimento ou quando a indicação dela aparece no perfil ("indicado por …"). A moderação vê nas filas. |
-| E-mail da conta | `Usuario` | Só a própria pessoa (no menu) e a moderação (de quem pede a reivindicação, dos donos atuais e de quem escreveu um depoimento denunciado). Nunca aparece no site público. |
+| E-mail da conta | `Usuario` | Só a própria pessoa (no menu) e a moderação, que vê o e-mail de todas as contas na aba "Contas" e na ficha de cada uma, além das filas. Nunca aparece no site público. |
 | Senha | `Usuario.senhaHash` | Ninguém: só o hash scrypt é guardado. |
-| Sessões | `Sessao` | Ninguém: só o hash do token. |
+| Sessões | `Sessao` | Ninguém vê o token: só o hash é guardado. A moderação vê quantas sessões abertas uma conta tem e quando foram abertas. |
 | Dados do perfil do negócio | `Empresa` | **Público** quando o negócio está publicado. |
 | Dados do pedido de reivindicação (relação, contato, CNPJ, site, mensagem) | `Reivindicacao` | Só a moderação. A pessoa vê o status e o motivo da recusa. |
 | Depoimentos | `Depoimento` | **Públicos**, com nome e data. |
@@ -787,7 +902,12 @@ Para uma ação nova de moderação, registre sempre na auditoria.
 | Tipos de negócio visíveis nos filtros | 8 (o resto em "Ver todos") | `src/app/explorar/page.tsx` |
 | Sugestões do "Onde?" | até 8 | `src/lib/diretorio.ts` |
 | Itens por fila da moderação | 50 | `src/app/moderacao/page.tsx` |
-| Registros na aba de auditoria | 100 | `src/app/moderacao/page.tsx` |
+| Itens por página nas listas do painel (negócios, contas e depoimentos) | 30 | `src/lib/moderacao/filtros.ts` |
+| Registros por página na auditoria | 50 | `src/lib/moderacao/filtros.ts` |
+| Itens de cada lista na ficha da conta | 30 | `src/lib/moderacao/consultas.ts` |
+| Registros da auditoria na ficha da conta | 20 | `src/lib/moderacao/consultas.ts` |
+| Semanas no gráfico de atividade | 12 | `src/lib/moderacao/indicadores.ts` |
+| Itens de cada lista do diretório na visão geral | 8 | `src/app/moderacao/VisaoGeral.tsx` |
 | Leitura da história | 200 palavras por minuto | `src/lib/texto.ts` |
 
 ---
@@ -820,6 +940,7 @@ O sistema funciona hoje assim. Algumas destas situações podem ser intencionais
 
 - Não há recuperação de senha, confirmação de e-mail, troca de nome ou e-mail, nem exclusão da conta.
 - Não há limite de tentativas de login.
+- Não há registro do último acesso: "Sair" apaga a sessão, então o painel só sabe das sessões que continuam abertas.
 - Sessões vencidas deixam de valer, mas não são apagadas do banco.
 - Ninguém recebe e-mail: nem o dono quando o pedido é decidido, nem a moderação quando chega algo novo. Hoje o site não tem serviço de envio de e-mail.
 
@@ -829,13 +950,16 @@ O sistema funciona hoje assim. Algumas destas situações podem ser intencionais
 
 Os [próximos passos do README](../README.md#próximos-passos-sugeridos) listam outras ideias.
 
+## Issue #40 — Perfis profissionais e serviços (primeira etapa)
 
-## Issue #40 — Perfis profissionais e catálogo de serviços (primeira etapa)
-
-- O perfil profissional é opcional e vinculado a um usuário autenticado. A pessoa pode ocultá-lo.
-- O contato profissional somente é exibido se fornecido voluntariamente e o perfil estiver publicado.
-- Cada serviço pertence a **exatamente um prestador**: perfil profissional publicado ou empresa verificada da qual o autor seja dono. A migração impõe uma restrição de exclusividade no PostgreSQL.
-- Novos anúncios começam como `pendente`; apenas a moderação pode mudar para `publicado` ou `rejeitado`. Somente anúncios publicados, não ocultos e de prestadores visíveis aparecem em `/servicos`.
-- Quem criou o serviço pode ocultá-lo ou reexibi-lo. Ainda não é possível editar os dados do anúncio nesta primeira entrega.
-- A verificação de permissão ocorre nas Server Actions, e as decisões são registradas na auditoria.
-- Não há pagamentos, propostas de orçamento, avaliações, denúncias de anúncios ou chat nesta primeira etapa.
+- O cadastro profissional é opcional e está ligado a uma conta do Negócio do Bem, sem exigir novo login. A pessoa escolhe nome público, apresentação, localização oficial do IBGE, atendimento remoto e/ou presencial e contatos.
+- Um perfil só pode ser publicado quando tem pelo menos um contato profissional (site ou e-mail). O contato só é exibido no catálogo se o perfil estiver publicado.
+- Um serviço pertence **exatamente a um prestador**: perfil profissional ou empresa. A migração impõe essa exclusividade via `CHECK` do PostgreSQL, juntamente com a necessidade de ao menos uma modalidade e estados válidos.
+- Somente quem administra uma empresa aprovada, visível e verificada pode cadastrar ou revisar anúncios desse negócio. O perfil profissional deve estar publicado. Essas verificações ocorrem **na Server Action e dentro da transação de gravação**, não apenas na interface.
+- O anúncio começa em `pendente`. A moderação pode aprovar (`publicado`) ou rejeitar (`rejeitado`), e ao rejeitar deve informar o motivo. Apenas anúncios publicados, não ocultos e associados a prestadores visíveis aparecem em `/servicos`.
+- Um anúncio rejeitado pode ser corrigido e reenviado; revisar um anúncio publicado também o retira temporariamente do catálogo até nova análise. O prestador de um anúncio existente nunca é transferido para outro perfil ou empresa.
+- Se um perfil profissional alterar os seus dados públicos (nome, apresentação, localização, modalidade ou contato), seus anúncios aprovados voltam a `pendente`. Ocultar um perfil remove automaticamente seus serviços do catálogo sem apagar os registros.
+- Donos podem ocultar ou reexibir os próprios anúncios; isso não altera a decisão de moderação. Ações de criação, revisão, moderação e visibilidade são auditadas.
+- O catálogo usa pesquisa textual normalizada por até seis termos, categoria, 18 resultados por página e ordenação por data e identificador. A paginação verifica os limites contra o total antes de consultar a página.
+- A interface mantém a paleta da marca e o modo escuro. Perfis, anúncios e revisão estão integrados ao painel do usuário e à moderação.
+- **Fora do escopo:** propostas, contratos, pagamentos, mensagens, avaliações, denúncias específicas dos anúncios e histórico de negociações. Esses fluxos exigem discussão e PRs separados.
