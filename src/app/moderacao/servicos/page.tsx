@@ -49,7 +49,8 @@ async function Conteudo({ searchParams }: Pick<PageProps<"/moderacao/servicos">,
   });
   return (
     <section className="mt-8 space-y-5">
-      {params.aviso === "dados_invalidos" && <p role="alert" className="text-coral-700">Informe um motivo válido para recusar.</p>}
+      {params.aviso === "dados_invalidos" && <p role="alert" className="text-coral-700">Informe uma decisão e um motivo válido.</p>}
+      {params.aviso === "feito" && <p role="status" className="rounded-xl bg-folha-50 p-3 text-sm text-folha">Decisão registrada com sucesso.</p>}
       {params.aviso === "indisponivel" && <p role="alert" className="text-coral-700">O anúncio já foi analisado ou o prestador não pode publicá-lo.</p>}
       <p className="text-sm text-suave">{total} {total === 1 ? "anúncio pendente" : "anúncios pendentes"}</p>
       {pendentes.length === 0 ? (
