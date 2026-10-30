@@ -64,7 +64,7 @@ async function Conteudo() {
         <h2 className="font-serif text-2xl font-semibold">Meus negócios</h2>
         {empresas.length === 0 ? (
           <div className="cartao mt-4 p-6 text-suave">
-            Você ainda não tem um negócio verificado.{" "}
+            Você ainda não assumiu um perfil de negócio.{" "}
             <Link href="/indicar" className="link">
               Cadastrar meu negócio
             </Link>{" "}

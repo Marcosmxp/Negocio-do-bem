@@ -107,7 +107,7 @@ export function FormIndicar() {
       {estado?.erro && <Aviso tipo="erro">{estado.erro}</Aviso>}
 
       <BotaoEnviar pendente={pendente} className="botao-coral w-full py-3 text-base" enviando="Enviando…">
-        {souDono ? "Cadastrar e verificar meu negócio" : "Enviar indicação"}
+        {souDono ? "Cadastrar e assumir meu negócio" : "Enviar indicação"}
       </BotaoEnviar>
     </form>
   );

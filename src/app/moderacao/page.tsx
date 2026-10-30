@@ -154,7 +154,7 @@ async function Reivindicacoes({ codigo }: { codigo: string | null }) {
                   <a href={linkPerfil(r.empresa.instagramUsername)} target="_blank" rel="noopener noreferrer" className="link">
                     @{r.empresa.instagramUsername}
                   </a>{" "}
-                  · {r.empresa.status === "verificada" ? "já verificado" : "sem dono"}
+                  · {r.empresa.status === "verificada" ? "perfil já assumido" : "sem dono"}
                 </p>
               </div>
               <div className="text-right text-sm">
