@@ -10,7 +10,7 @@ const modelo = {
   titulo: "Desenvolvimento web",
   descricao: "Criação de sites responsivos para pequenos negócios.",
   categoria: "Tecnologia",
-  remoto: true, presencial: false, precoReferencia: "",
+  remoto: true, presencial: false, precoReferencia: "", areasAtendimento: "",
 };
 
 describe("validação de serviços", () => {
@@ -25,6 +25,17 @@ describe("validação de serviços", () => {
     expect(esquemaServico.safeParse({ ...modelo, prestador: "empresa" }).success).toBe(false);
     expect(esquemaServico.safeParse({ ...modelo, remoto: false }).success).toBe(false);
     expect(esquemaServico.safeParse({ ...modelo, prestador: "empresa", empresaId: "empresa1" }).success).toBe(true);
+  });
+  it("valida municípios de atendimento e elimina duplicidades", () => {
+    const validado = esquemaServico.parse({
+      ...modelo, presencial: true, areasAtendimento: "Recife, PE\nOlinda, PE\nRecife, PE",
+    });
+    expect(validado.areasAtendimento).toEqual([
+      { cidade: "Recife", uf: "PE" }, { cidade: "Olinda", uf: "PE" },
+    ]);
+    expect(esquemaServico.safeParse({ ...modelo, presencial: true }).success).toBe(false);
+    expect(esquemaServico.safeParse({ ...modelo, areasAtendimento: "Cidade inventada, PE" }).success).toBe(false);
+    expect(esquemaServico.safeParse({ ...modelo, areasAtendimento: Array(11).fill("Recife, PE").join("\n") }).success).toBe(false);
   });
   it("proíbe identificar empresa num serviço pessoal", () => {
     expect(esquemaServico.safeParse({ ...modelo, empresaId: "empresa1" }).success).toBe(false);
@@ -42,11 +53,15 @@ describe("validação de serviços", () => {
   it("exige motivo de rejeição suficientemente claro", () => {
     expect(esquemaModeracaoServico.safeParse({ decisao: "rejeitar", motivo: "x" }).success).toBe(false);
     expect(esquemaModeracaoServico.safeParse({ decisao: "rejeitar", motivo: "Conteúdo incompleto no anúncio." }).success).toBe(true);
+    expect(esquemaModeracaoServico.safeParse({ decisao: "suspender", motivo: "x" }).success).toBe(false);
+    expect(esquemaModeracaoServico.safeParse({ decisao: "suspender", motivo: "Violação das regras de publicação." }).success).toBe(true);
   });
   it("controla os estados do anúncio", () => {
     expect(estadoAposRevisao()).toBe("pendente");
     expect(estadoAposDecisao("pendente", "aprovar")).toBe("publicado");
     expect(estadoAposDecisao("publicado", "rejeitar")).toBeNull();
+    expect(estadoAposDecisao("publicado", "suspender")).toBe("suspenso");
+    expect(estadoAposDecisao("pendente", "suspender")).toBeNull();
   });
   it("não repete a última página da busca", () => {
     expect(numeroPagina("999999")).toBe(500);
@@ -55,8 +70,8 @@ describe("validação de serviços", () => {
     expect(limitarPagina(500, 0)).toEqual({ pagina: 1, paginas: 1 });
   });
   it("normaliza os termos buscados", () => {
-    expect(buscaServico({ titulo: "Criação", descricao: "Páginas", categoria: "Tecnologia", cidade: "São Paulo", uf: "SP" }))
-      .toContain("criacao paginas tecnologia sao paulo sp");
+    expect(buscaServico({ titulo: "Criação", descricao: "Páginas", categoria: "Tecnologia" }))
+      .toBe("criacao paginas tecnologia");
     expect(idServicoValido("../123")).toBe(false);
   });
 });
