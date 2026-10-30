@@ -357,7 +357,7 @@ Na aba "Reivindicações" (`/moderacao?aba=reivindicacoes`) ficam os pedidos que
 
 Cada pedido mostra:
 
-- o negócio, o @ (com link para o Instagram) e se o perfil já foi assumido ou está sem dono.
+- o negócio, o @ (com link para o Instagram) e se o perfil já foi assumido ou está sem dono;
 - o caminho usado, a data do pedido e, se for o caso, a data em que expirou;
 - quem pediu: nome e e-mail;
 - no pedido por dados do negócio:
@@ -674,7 +674,7 @@ Código: filtros e "Onde?" em `src/lib/diretorio.ts`, consultas em `src/lib/cons
 
 - **Abre** pela busca da página inicial, pelos tipos de negócio, pelos atalhos e pelo "Explorar" do menu.
 - **Ordem:**
-  - **Perfis assumidos primeiro** (padrão): os perfis que já foram assumidos e, dentro de cada grupo, os atualizados mais recentemente.
+  - **Assumidos primeiro** (padrão): os perfis que já foram assumidos e, dentro de cada grupo, os atualizados mais recentemente;
   - **Mais recentes:** pela data de entrada no diretório;
   - **Nome (A–Z)**.
   - Não existe ranking por nota nem anúncio pago.

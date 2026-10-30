@@ -42,11 +42,12 @@ describe("rótulos de perfil assumido", () => {
 
     expect(card).toContain("Perfil assumido");
     expect(linha).toContain('aria-label="Perfil assumido"');
+    expect(linha).toContain("<title>Perfil assumido</title>");
     expect(linha).not.toContain("Verificado pelo dono");
   });
 
   it("muda o rótulo da ordenação sem quebrar os parâmetros existentes", () => {
-    expect(ORDENS.verificados).toBe("Perfis assumidos primeiro");
+    expect(ORDENS.verificados).toBe("Assumidos primeiro");
     expect(lerFiltros({ verificados: "sim", ordem: "verificados" })).toMatchObject({
       verificados: true,
       ordem: "verificados",

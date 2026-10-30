@@ -33,7 +33,7 @@ Daí saem as três peças do produto:
 
 Quase toda regra do sistema sai de um destes princípios. Diante de uma decisão nova, comece por eles.
 
-### A comunidade indica, o dono confirma, a moderação garante
+### A comunidade indica, o dono assume, a moderação corrige depois
 
 O diretório cresce sem precisar que os donos se cadastrem primeiro: qualquer pessoa indica. Isso traz um risco, que é alguém se passar pelo dono ou cadastrar um perfil falso. A resposta tem três partes:
 
