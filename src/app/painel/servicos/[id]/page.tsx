@@ -48,6 +48,11 @@ async function Conteudo({ params }: Pick<PageProps<"/painel/servicos/[id]">, "pa
     <div className="space-y-6">
       <Link href="/painel/servicos" className="link text-sm">← Voltar aos meus serviços</Link>
       <h1 className="font-serif text-4xl font-semibold">Revisar serviço</h1>
+      {servico.status === "suspenso" && servico.motivoSuspensao && (
+        <p role="status" className="rounded-2xl bg-coral-50 p-4 text-sm text-coral-700">
+          Suspenso pela moderação: {servico.motivoSuspensao}. Corrija o anúncio e envie para nova análise.
+        </p>
+      )}
       {servico.status === "rejeitado" && servico.motivoRecusa && (
         <p role="status" className="rounded-2xl bg-coral-50 p-4 text-sm text-coral-700">
           Motivo da recusa: {servico.motivoRecusa}
