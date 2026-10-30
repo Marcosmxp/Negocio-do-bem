@@ -114,7 +114,6 @@ export function FormularioServico({
             id="areasAtendimento"
             rotulo="Municípios atendidos presencialmente"
             erro={estado?.erros?.areasAtendimento}
-            ajuda="Informe uma cidade por linha, incluindo a UF. Ex.: Recife, PE. Até 10 cidades. Deixe vazio se o serviço for exclusivamente remoto."
           >
             <textarea
               id="areasAtendimento"
@@ -122,10 +121,12 @@ export function FormularioServico({
               rows={3}
               maxLength={1300}
               aria-invalid={!!estado?.erros?.areasAtendimento}
+              aria-describedby="areasAtendimento-dica"
               defaultValue={valor("areasAtendimento", servico?.areasAtendimento.map(({ cidade, uf }) => `${cidade}, ${uf}`).join("\n") ?? "")}
               placeholder={"Recife, PE\nOlinda, PE"}
               className="campo min-h-28 w-full resize-y leading-relaxed"
             />
+            <p id="areasAtendimento-dica" className="ajuda">Uma cidade por linha, com UF. Ex.: Recife, PE; Olinda, PE. Até 10 cidades. Para serviços apenas remotos, pode deixar vazio.</p>
           </Campo>
         </div>
 
