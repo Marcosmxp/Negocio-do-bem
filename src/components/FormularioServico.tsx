@@ -20,6 +20,7 @@ export type ServicoEditavel = {
   remoto: boolean;
   presencial: boolean;
   precoReferencia: string | null;
+  areasAtendimento: { cidade: string; uf: string }[];
 };
 
 export function FormularioServico({
@@ -109,6 +110,23 @@ export function FormularioServico({
             presencial={temValores ? valores.presencial === "sim" : (servico?.presencial ?? false)}
             erro={estado?.erros?.modalidade}
           />
+          <Campo
+            id="areasAtendimento"
+            rotulo="Municípios atendidos presencialmente"
+            erro={estado?.erros?.areasAtendimento}
+            ajuda="Informe uma cidade por linha, incluindo a UF. Ex.: Recife, PE. Até 10 cidades. Deixe vazio se o serviço for exclusivamente remoto."
+          >
+            <textarea
+              id="areasAtendimento"
+              name="areasAtendimento"
+              rows={3}
+              maxLength={1300}
+              aria-invalid={!!estado?.erros?.areasAtendimento}
+              defaultValue={valor("areasAtendimento", servico?.areasAtendimento.map(({ cidade, uf }) => `${cidade}, ${uf}`).join("\n") ?? "")}
+              placeholder={"Recife, PE\nOlinda, PE"}
+              className="campo min-h-28 w-full resize-y leading-relaxed"
+            />
+          </Campo>
         </div>
 
         <div className="rounded-2xl border border-linha bg-papel/70 p-4">
