@@ -51,7 +51,7 @@ export async function salvarPerfilProfissional(_estado: EstadoFormulario, dados:
     if (alterouInformacaoPublica) {
       await tx.servico.updateMany({
         where: { perfilUsuarioId: usuario.id, status: "publicado" },
-        data: { status: "pendente", motivoRecusa: null, moderadoEm: null },
+        data: { status: "pendente", cidade: municipio.nome, uf: municipio.uf, motivoRecusa: null, moderadoEm: null },
       });
     }
     await registrarAuditoria(tx, {
@@ -74,9 +74,10 @@ export async function salvarServico(_estado: EstadoFormulario, dados: FormData):
     titulo: texto(dados, "titulo"), descricao: texto(dados, "descricao"),
     categoria: texto(dados, "categoria"), remoto: dados.get("remoto") === "sim",
     presencial: dados.get("presencial") === "sim", precoReferencia: texto(dados, "precoReferencia"),
+    areasAtendimento: texto(dados, "areasAtendimento"),
   });
   if (!validado.success) return { erros: errosPorCampo(validado.error), valores };
-  const { prestador, empresaId, ...conteudo } = validado.data;
+  const { prestador, empresaId, areasAtendimento, ...conteudo } = validado.data;
 
   const resultado = await db.$transaction(async (tx) => {
     const destino = await identificarPrestador(tx, usuario.id, prestador, empresaId);
@@ -92,8 +93,9 @@ export async function salvarServico(_estado: EstadoFormulario, dados: FormData):
         where: { id },
         data: {
           ...conteudo, cidade: destino.cidade, uf: destino.uf,
-          busca: buscaServico({ ...conteudo, cidade: destino.cidade, uf: destino.uf }),
-          status: estadoAposRevisao(), motivoRecusa: null, moderadoEm: null,
+          busca: buscaServico(conteudo),
+          areasAtendimento: { deleteMany: {}, create: areasAtendimento },
+          status: estadoAposRevisao(), motivoRecusa: null, motivoSuspensao: null, moderadoEm: null,
         },
       });
       await registrarAuditoria(tx, { usuarioId: usuario.id, acao: "servico.reenviado", alvoTipo: "servico", alvoId: id });
@@ -103,7 +105,8 @@ export async function salvarServico(_estado: EstadoFormulario, dados: FormData):
     const criado = await tx.servico.create({
       data: {
         ...conteudo, ...destino,
-        busca: buscaServico({ ...conteudo, cidade: destino.cidade, uf: destino.uf }),
+        busca: buscaServico(conteudo),
+        areasAtendimento: { create: areasAtendimento },
         status: "pendente",
       },
     });
@@ -152,11 +155,11 @@ export async function moderarServico(dados: FormData): Promise<void> {
   if (!idServicoValido(id) || !validado.success) redirect(`${FILA}?aviso=dados_invalidos`);
 
   const decisao = validado.data;
-  const status = decisao.decisao === "aprovar" ? "publicado" : "rejeitado";
+  const status = decisao.decisao === "aprovar" ? "publicado" : decisao.decisao === "suspender" ? "suspenso" : "rejeitado";
   const resultado = await db.$transaction(async (tx) => {
     const { count } = await tx.servico.updateMany({
       where: {
-        id, status: "pendente",
+        id, status: status === "suspenso" ? "publicado" : "pendente",
         ...(status === "publicado" ? {
           OR: [
             { perfil: { is: { publicado: true } } },
@@ -167,6 +170,7 @@ export async function moderarServico(dados: FormData): Promise<void> {
       data: {
         status, moderadoEm: new Date(),
         motivoRecusa: decisao.decisao === "rejeitar" ? decisao.motivo : null,
+        motivoSuspensao: decisao.decisao === "suspender" ? decisao.motivo : null,
       },
     });
     if (count) await registrarAuditoria(tx, {
