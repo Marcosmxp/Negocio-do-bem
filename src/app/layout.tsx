@@ -7,6 +7,7 @@ import type { Metadata, Viewport } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 import { Abertura } from "@/components/Abertura";
+import { CortinaDePagina } from "@/components/cortina/CortinaDePagina";
 import { AlternarTema } from "@/components/AlternarTema";
 import { Logo } from "@/components/Logo";
 import { MenuUsuario } from "@/components/MenuUsuario";
@@ -67,6 +68,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="flex min-h-full flex-col">
         {/* Primeiro no <body>: o script da abertura roda antes da primeira pintura. Só age em "/". */}
         <Abertura />
+        <Suspense fallback={null}><CortinaDePagina /></Suspense>
 
         <header className="sticky top-0 z-30 border-b border-linha bg-papel">
           <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-2 px-4 sm:gap-4 sm:px-6">
