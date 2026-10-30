@@ -734,3 +734,14 @@ A migração da feature foi atualizada **antes de entrar em `stage`**. Quem já 
 ### Escopo futuro
 
 Pedidos de orçamento, denúncias, contratos, avaliações, histórico de serviços e pagamentos não estão nesta PR. Devem começar por regras de negócio discutidas na issue #40, com testes de autorização e moderação antes da UI.
+
+
+### Issue #40 — Ajustes de revisão: cidades atendidas e moderação
+
+- `AreaAtendimentoServico` guarda até dez municípios validados por anúncio. A origem do prestador permanece em `PerfilProfissional` ou `Empresa`; a busca geográfica é feita pela associação, sem depender de CEP ou da PR #168.
+- `filtroServicosPublicos` compõe os critérios de modalidade e localização com a regra de elegibilidade. `count` e `findMany` usam o mesmo `where`.
+- O catálogo usa formulários GET nativos, com campos identificados, estado de erro acessível, comportamento responsivo e paginação que preserva filtros.
+- A moderação distingue publicação, rejeição e suspensão. Só um anúncio publicado pode ser suspenso, com justificativa e auditoria na transação. O prestador pode rever um anúncio suspenso, mas isso exige nova aprovação.
+- A validação contempla municípios repetidos, município inválido, presença de modalidade, operações suspensas e pesquisa geográfica.
+- Antes do merge: executar migrações num PostgreSQL descartável, lint, typecheck, testes e build; testar navegação por teclado e leitor de ecrã, 360/375/768/1280 px, claro/escuro e o fluxo de suspensão.
+- Dependências: a #137 propõe `confirmadoEm` para proprietários; quando integrada, serviços de empresas também precisarão dessa verificação, sem novo sistema de permissões. A #168 pode fornecer identificação territorial adicional sem fazer parte do MVP.
