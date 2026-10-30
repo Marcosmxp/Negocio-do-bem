@@ -3,9 +3,9 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { ConfirmarEmail } from "@/components/ConfirmarEmail";
 import { usuarioAtual } from "@/lib/auth/sessao";
+import { lerPreenchimento } from "@/lib/indicacao";
 import { metadadosDaPagina } from "@/lib/seo";
 import { FormIndicar } from "./FormIndicar";
-import { lerPreenchimento } from "./preenchimento";
 
 export const metadata: Metadata = metadadosDaPagina({
   titulo: "Indicar um negócio",
