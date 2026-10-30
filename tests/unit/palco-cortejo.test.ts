@@ -5,6 +5,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { Cortejo } from "@/components/cortejo/Cortejo";
+import { CortejoInicial } from "@/app/inicio/CortejoInicial";
 import { personagensDoCortejo } from "@/components/cortejo/dados";
 
 // O HTML que o servidor manda: o que aparece sem JavaScript e o que o leitor de tela lê.
@@ -24,6 +25,21 @@ describe("ciclos gerados", () => {
     const script = fileURLToPath(new URL("../../scripts/gerar-ciclos.mjs", import.meta.url));
     const css = readFileSync(new URL("../../src/components/cortejo/ciclos.css", import.meta.url), "utf8");
     expect(execFileSync(process.execPath, [script], { encoding: "utf8" })).toBe(css);
+  });
+});
+
+describe("Cortejo antes dos dados", () => {
+  it("leva às páginas rastreáveis de tipo sem inventar contagens", () => {
+    const inicial = renderToStaticMarkup(createElement(CortejoInicial));
+    const destinos = [...inicial.matchAll(/<a\b[^>]*href="([^"]+)"/g)].map((m) => m[1]);
+    expect(destinos).toEqual([
+      "/tipos/cafe-e-padaria",
+      "/tipos/moda-e-acessorios",
+      "/tipos/saude",
+      "/tipos/mercado-e-emporio",
+    ]);
+    expect(inicial).not.toContain("Nenhum negócio ainda");
+    expect(inicial).not.toContain("0 negócios");
   });
 });
 
