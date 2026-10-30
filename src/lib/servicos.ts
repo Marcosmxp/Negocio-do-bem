@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { campoEmail, campoMunicipio, campoSite } from "@/lib/formulario";
 import { normalizarTexto } from "@/lib/texto";
+import { conferirMunicipio } from "@/lib/municipios";
 import { CATEGORIAS_SERVICOS } from "@/lib/servicos/dominio";
 export { CATEGORIAS_SERVICOS } from "@/lib/servicos/dominio";
 
@@ -9,6 +10,7 @@ export const ESTADOS_SERVICO = {
   pendente: "Em análise",
   publicado: "Publicado",
   rejeitado: "Não aprovado",
+  suspenso: "Suspenso pela moderação",
 } as const;
 
 export const POR_PAGINA_SERVICOS = 18;
@@ -41,6 +43,31 @@ export const esquemaPerfilProfissional = z.object({
     path: ["emailContato"], message: "Para publicar, informe um e-mail profissional ou site.",
   });
 
+/** Valida até dez municípios oficiais, um por linha, com UF quando o nome é ambíguo. */
+export const esquemaAreasAtendimento = z.string().trim().max(1300).transform((valor, ctx) => {
+  const linhas = valor.split(/\r?\n/).map((linha) => linha.trim()).filter(Boolean);
+  if (linhas.length > 10) {
+    ctx.addIssue({ code: "custom", message: "Informe no máximo 10 municípios." });
+    return z.NEVER;
+  }
+  const areas: { cidade: string; uf: string }[] = [];
+  const identificadores = new Set<string>();
+  for (const linha of linhas) {
+    const resultado = conferirMunicipio(linha);
+    if ("erro" in resultado) {
+      ctx.addIssue({ code: "custom", message: `Município "${linha}": ${resultado.erro}` });
+      return z.NEVER;
+    }
+    const { nome: cidade, uf } = resultado.municipio;
+    const identificador = `${cidade}/${uf}`;
+    if (!identificadores.has(identificador)) {
+      identificadores.add(identificador);
+      areas.push({ cidade, uf });
+    }
+  }
+  return areas;
+});
+
 export const esquemaServico = z.object({
   prestador: z.enum(["profissional", "empresa"]),
   empresaId: z.string().max(80).optional(),
@@ -50,9 +77,13 @@ export const esquemaServico = z.object({
   remoto: z.boolean(),
   presencial: z.boolean(),
   precoReferencia: z.string().trim().max(100).transform((valor) => valor || null),
+  areasAtendimento: esquemaAreasAtendimento,
 })
   .refine((servico) => servico.remoto || servico.presencial, {
     path: ["modalidade"], message: "Escolha pelo menos uma modalidade.",
+  })
+  .refine((servico) => !servico.presencial || (Array.isArray(servico.areasAtendimento) && servico.areasAtendimento.length > 0), {
+    path: ["areasAtendimento"], message: "Indique pelo menos um município para atendimento presencial.",
   })
   .refine((servico) => servico.prestador !== "empresa" || !!servico.empresaId, {
     path: ["empresaId"], message: "Escolha a empresa.",
@@ -67,12 +98,17 @@ export const esquemaModeracaoServico = z.discriminatedUnion("decisao", [
     decisao: z.literal("rejeitar"),
     motivo: z.string().trim().min(10, "Informe o motivo da recusa (mínimo 10 caracteres).").max(500),
   }),
+  z.object({
+    decisao: z.literal("suspender"),
+    motivo: z.string().trim().min(10, "Informe o motivo da suspensão (mínimo 10 caracteres).").max(500),
+  }),
 ]);
 
 export function idServicoValido(valor: string): boolean {
   return /^[a-z0-9]{1,40}$/.test(valor);
 }
 
-export function buscaServico(dados: { titulo: string; descricao: string; categoria: string; cidade: string; uf: string }) {
-  return normalizarTexto([dados.titulo, dados.descricao, dados.categoria, dados.cidade, dados.uf].join(" "));
+export function buscaServico(dados: { titulo: string; descricao: string; categoria: string }) {
+  // Cidade do prestador não representa onde o serviço atende; filtros geográficos usam a relação própria.
+  return normalizarTexto([dados.titulo, dados.descricao, dados.categoria].join(" "));
 }
