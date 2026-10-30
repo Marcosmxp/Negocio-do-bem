@@ -32,6 +32,7 @@ CREATE TABLE "Servico" (
   "status" TEXT NOT NULL DEFAULT 'pendente',
   "oculto" BOOLEAN NOT NULL DEFAULT false,
   "motivoRecusa" TEXT,
+  "motivoSuspensao" TEXT,
   "moderadoEm" TIMESTAMP(3),
   "criadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
   "atualizadoEm" TIMESTAMP(3) NOT NULL,
@@ -41,8 +42,9 @@ CREATE TABLE "Servico" (
     OR ("perfilUsuarioId" IS NULL AND "empresaId" IS NOT NULL)
   ),
   CONSTRAINT "Servico_modalidade_check" CHECK ("remoto" OR "presencial"),
-  CONSTRAINT "Servico_status_check" CHECK ("status" IN ('pendente', 'publicado', 'rejeitado')),
-  CONSTRAINT "Servico_recusa_check" CHECK ("status" <> 'rejeitado' OR "motivoRecusa" IS NOT NULL)
+  CONSTRAINT "Servico_status_check" CHECK ("status" IN ('pendente', 'publicado', 'rejeitado', 'suspenso')),
+  CONSTRAINT "Servico_recusa_check" CHECK ("status" <> 'rejeitado' OR "motivoRecusa" IS NOT NULL),
+  CONSTRAINT "Servico_suspensao_check" CHECK ("status" <> 'suspenso' OR "motivoSuspensao" IS NOT NULL)
 );
 
 CREATE INDEX "PerfilProfissional_publicado_uf_idx" ON "PerfilProfissional"("publicado", "uf");
@@ -58,3 +60,14 @@ ALTER TABLE "Servico" ADD CONSTRAINT "Servico_perfilUsuarioId_fkey"
   FOREIGN KEY ("perfilUsuarioId") REFERENCES "PerfilProfissional"("usuarioId") ON DELETE CASCADE ON UPDATE CASCADE;
 ALTER TABLE "Servico" ADD CONSTRAINT "Servico_empresaId_fkey"
   FOREIGN KEY ("empresaId") REFERENCES "Empresa"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- Municípios atendidos por serviço; preserva a cidade de origem como dado separado.
+CREATE TABLE "AreaAtendimentoServico" (
+  "servicoId" TEXT NOT NULL,
+  "cidade" TEXT NOT NULL,
+  "uf" TEXT NOT NULL,
+  CONSTRAINT "AreaAtendimentoServico_pkey" PRIMARY KEY ("servicoId", "cidade", "uf")
+);
+CREATE INDEX "AreaAtendimentoServico_cidade_uf_idx" ON "AreaAtendimentoServico"("cidade", "uf");
+ALTER TABLE "AreaAtendimentoServico" ADD CONSTRAINT "AreaAtendimentoServico_servicoId_fkey"
+  FOREIGN KEY ("servicoId") REFERENCES "Servico"("id") ON DELETE CASCADE ON UPDATE CASCADE;
