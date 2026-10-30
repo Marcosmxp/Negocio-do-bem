@@ -43,6 +43,7 @@ const ESTADOS: Record<string, { texto: string; classe: string }> = {
   pendente: { texto: "Em análise", classe: "bg-amber-50 text-amber-800" },
   publicado: { texto: "Publicado", classe: "bg-folha-50 text-folha" },
   rejeitado: { texto: "Não aprovado", classe: "bg-coral-50 text-coral-700" },
+  suspenso: { texto: "Suspenso", classe: "bg-coral-50 text-coral-700" },
 };
 
 async function Conteudo({ searchParams }: Pick<PageProps<"/painel/servicos">, "searchParams">) {
@@ -108,6 +109,11 @@ async function Conteudo({ searchParams }: Pick<PageProps<"/painel/servicos">, "s
                     <h3 className="mt-4 break-words font-serif text-xl font-semibold leading-tight">{servico.titulo}</h3>
                     <p className="mt-2 text-xs text-suave">{servico.categoria} · {servico.cidade}, {servico.uf}</p>
                   </div>
+                  {servico.status === "suspenso" && servico.motivoSuspensao && (
+                    <p role="status" className="rounded-xl bg-coral-50 p-3 text-sm text-coral-700">
+                      Suspenso pela moderação: {servico.motivoSuspensao}
+                    </p>
+                  )}
                   {servico.status === "rejeitado" && servico.motivoRecusa && (
                     <p role="status" className="rounded-xl bg-coral-50 p-3 text-sm text-coral-700">
                       Motivo da recusa: {servico.motivoRecusa}
