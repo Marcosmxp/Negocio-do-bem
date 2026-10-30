@@ -21,10 +21,13 @@ export default function ModeracaoServicos(props: PageProps<"/moderacao/servicos"
       </nav>
       <h1 className="font-serif text-4xl font-semibold tracking-tight">Analisar anúncios de serviços</h1>
       <p className="mt-3 max-w-2xl text-sm leading-relaxed text-suave">
-        Os anúncios só entram no catálogo após a revisão. Informe o motivo ao recusar.
+        Analise os anúncios novos e suspenda serviços publicados que não respeitem as regras. Toda decisão fica registrada.
       </p>
       <Suspense fallback={<div className="mt-8 h-80 animate-pulse rounded-3xl bg-superficie" />}>
         <Conteudo searchParams={props.searchParams} />
+      </Suspense>
+      <Suspense fallback={<div className="mt-8 h-64 animate-pulse rounded-3xl bg-superficie" />}>
+        <Publicados searchParams={props.searchParams} />
       </Suspense>
     </div>
   );
@@ -86,6 +89,73 @@ async function Conteudo({ searchParams }: Pick<PageProps<"/moderacao/servicos">,
         </div>
       )}
       <Paginacao atual={pagina} total={paginas} href={(p) => p === 1 ? "/moderacao/servicos" : `/moderacao/servicos?pagina=${p}`} />
+    </section>
+  );
+}
+
+
+/** Serviços publicados: retirada motivada, sem apagar o histórico nem permitir suspensões anónimas. */
+async function Publicados({ searchParams }: Pick<PageProps<"/moderacao/servicos">, "searchParams">) {
+  await exigirModerador();
+  const params = await searchParams;
+  const q = typeof params.buscarPublicado === "string" ? params.buscarPublicado.trim().slice(0, 100) : "";
+  const where = {
+    status: "publicado",
+    ...(q ? { titulo: { contains: q, mode: "insensitive" as const } } : {}),
+  };
+  const total = await db.servico.count({ where });
+  const { pagina, paginas } = limitarPagina(numeroPagina(params.paginaPublicados), total, 20);
+  const itens = await db.servico.findMany({
+    where,
+    select: {
+      id: true, titulo: true, categoria: true, criadoEm: true,
+      perfil: { select: { nomePublico: true } },
+      empresa: { select: { nome: true } },
+    },
+    orderBy: [{ criadoEm: "desc" }, { id: "desc" }],
+    skip: (pagina - 1) * 20,
+    take: 20,
+  });
+  const linkPagina = (p: number) => {
+    const query = new URLSearchParams();
+    if (q) query.set("buscarPublicado", q);
+    if (p > 1) query.set("paginaPublicados", String(p));
+    return `/moderacao/servicos${query.size ? `?${query}` : ""}#publicados`;
+  };
+  return (
+    <section id="publicados" aria-labelledby="titulo-publicados" className="mt-12 space-y-5 border-t border-linha pt-8">
+      <div>
+        <h2 id="titulo-publicados" className="font-serif text-3xl font-semibold">Serviços publicados</h2>
+        <p className="mt-2 text-sm text-suave">A suspensão retira imediatamente o anúncio da pesquisa e exige uma justificativa.</p>
+      </div>
+      <form method="get" action="/moderacao/servicos" role="search" aria-label="Buscar serviços publicados" className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
+        <label className="space-y-2">
+          <span className="block text-sm font-medium">Título do anúncio</span>
+          <input name="buscarPublicado" type="search" defaultValue={q} maxLength={100} placeholder="Procurar serviço publicado" className="campo min-h-12 w-full" />
+        </label>
+        <button type="submit" className="botao-claro min-h-12 self-end">Pesquisar</button>
+      </form>
+      <p className="text-sm text-suave" aria-live="polite">{total} {total === 1 ? "anúncio publicado" : "anúncios publicados"}</p>
+      {itens.length === 0 ? <p className="cartao p-6 text-sm text-suave">Nenhum serviço publicado encontrado.</p> : (
+        <div className="grid gap-4">
+          {itens.map((servico) => (
+            <article key={servico.id} className="cartao grid min-w-0 gap-4 p-5 sm:grid-cols-[minmax(0,1fr)_minmax(16rem,1fr)] sm:p-6">
+              <div className="min-w-0">
+                <h3 className="break-words font-serif text-xl font-semibold">{servico.titulo}</h3>
+                <p className="mt-2 text-sm text-suave">{servico.perfil?.nomePublico ?? servico.empresa?.nome} · {servico.categoria}</p>
+              </div>
+              <form action={moderarServico} className="space-y-2">
+                <input type="hidden" name="id" value={servico.id} />
+                <input type="hidden" name="decisao" value="suspender" />
+                <label htmlFor={`suspender-${servico.id}`} className="rotulo">Justificativa da suspensão</label>
+                <textarea id={`suspender-${servico.id}`} name="motivo" required minLength={10} maxLength={500} rows={2} className="campo w-full" placeholder="Descreva a regra violada e como corrigir." />
+                <BotaoEnviar className="botao-claro min-h-11 w-full">Suspender publicação</BotaoEnviar>
+              </form>
+            </article>
+          ))}
+        </div>
+      )}
+      <Paginacao atual={pagina} total={paginas} href={linkPagina} />
     </section>
   );
 }
