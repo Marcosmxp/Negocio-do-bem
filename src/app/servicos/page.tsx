@@ -71,19 +71,23 @@ async function Lista({ searchParams }: Pick<PageProps<"/servicos">, "searchParam
   const params = await searchParams;
   const q = typeof params.q === "string" ? params.q.slice(0, 100) : "";
   const categoria = typeof params.categoria === "string" && CATEGORIAS_SERVICOS.some((c) => c === params.categoria) ? params.categoria : "";
-  const { total, itens, pagina, paginas } = await listarServicosPublicos({ q, categoria, pagina: params.pagina });
+  const municipio = typeof params.municipio === "string" ? params.municipio.slice(0, 120) : "";
+  const modalidade = params.modalidade === "remoto" || params.modalidade === "presencial" ? params.modalidade : "";
+  const { total, itens, pagina, paginas, municipioInvalido } = await listarServicosPublicos({ q, categoria, municipio, modalidade, pagina: params.pagina });
 
   function endereco(p: number) {
     const qs = new URLSearchParams();
     if (q) qs.set("q", q);
     if (categoria) qs.set("categoria", categoria);
+    if (municipio) qs.set("municipio", municipio);
+    if (modalidade) qs.set("modalidade", modalidade);
     if (p > 1) qs.set("pagina", String(p));
     return `/servicos${qs.size ? `?${qs}` : ""}`;
   }
 
   return (
     <section className="mt-8" aria-label="Catálogo de serviços">
-      <form role="search" className="cartao grid gap-3 p-3 shadow-sm shadow-tinta/5 sm:p-4 lg:grid-cols-[minmax(0,1fr)_minmax(12rem,16rem)_auto]" action="/servicos" method="get">
+      <form role="search" aria-label="Encontrar serviços" className="cartao grid gap-3 p-3 shadow-sm shadow-tinta/5 sm:grid-cols-2 sm:p-4 xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.9fr)_auto]" action="/servicos" method="get">
         <label className="flex min-w-0 items-center gap-3 rounded-2xl border border-linha bg-papel/60 px-4 transition focus-within:border-coral focus-within:ring-2 focus-within:ring-coral-100">
           <IconeRede nome="buscar" className="h-5 w-5 shrink-0 text-coral-700" />
           <span className="min-w-0 flex-1 py-2">
@@ -101,11 +105,30 @@ async function Lista({ searchParams }: Pick<PageProps<"/servicos">, "searchParam
             </select>
           </span>
         </label>
-        <button type="submit" className="botao-coral min-h-14 w-full rounded-2xl px-7 text-base lg:w-auto">
+        <label className="flex min-w-0 items-center gap-2 rounded-2xl border border-linha bg-papel/60 px-4 focus-within:border-coral focus-within:ring-2 focus-within:ring-coral-100">
+          <IconeRede nome="local" className="h-5 w-5 shrink-0 text-suave" />
+          <span className="min-w-0 flex-1 py-2">
+            <span className="block text-xs font-medium text-suave">Onde precisa?</span>
+            <input name="municipio" type="search" maxLength={120} defaultValue={municipio} placeholder="Recife, PE" aria-invalid={municipioInvalido} aria-describedby={municipioInvalido ? "aviso-municipio" : undefined} className="min-h-7 w-full bg-transparent text-[15px] text-tinta placeholder:text-suave/70 focus:outline-none" />
+          </span>
+        </label>
+        <label className="flex min-w-0 items-center gap-2 rounded-2xl border border-linha bg-papel/60 px-4 focus-within:border-coral focus-within:ring-2 focus-within:ring-coral-100">
+          <IconeRede nome="remoto" className="h-5 w-5 shrink-0 text-suave" />
+          <span className="min-w-0 flex-1 py-2">
+            <span className="block text-xs font-medium text-suave">Atendimento</span>
+            <select name="modalidade" defaultValue={modalidade} className="min-h-7 w-full bg-transparent text-[15px] text-tinta focus:outline-none">
+              <option value="">Todos</option>
+              <option value="remoto">Remoto</option>
+              <option value="presencial">Presencial</option>
+            </select>
+          </span>
+        </label>
+        <button type="submit" className="botao-coral min-h-14 w-full rounded-2xl px-7 text-base sm:col-span-2 xl:col-span-1 xl:w-auto">
           Buscar <IconeRede nome="seta" className="h-4 w-4" />
         </button>
       </form>
 
+      {municipioInvalido && <p id="aviso-municipio" role="alert" className="mt-3 rounded-xl border border-coral/30 bg-coral-50 p-3 text-sm text-coral-700">Cidade não reconhecida. Digite um município brasileiro com UF, por exemplo: Recife, PE.</p>}
       <div className="mt-8 flex flex-wrap items-end justify-between gap-3 border-b border-linha pb-4">
         <div>
           <p className="text-xs font-semibold tracking-wider text-coral-700 uppercase">Oportunidades da comunidade</p>
@@ -143,7 +166,7 @@ async function Lista({ searchParams }: Pick<PageProps<"/servicos">, "searchParam
               <p className="mt-4 line-clamp-4 flex-1 whitespace-pre-line break-words text-sm leading-relaxed text-suave">{servico.descricao}</p>
               <div className="mt-5 flex flex-wrap items-center gap-2 text-xs text-suave">
                 <span className="inline-flex items-center gap-1.5 rounded-full bg-papel px-2.5 py-1.5">
-                  <IconeRede nome="local" className="h-3.5 w-3.5" /> {servico.cidade}, {servico.uf}
+                  <IconeRede nome="local" className="h-3.5 w-3.5" /> {servico.presencial && servico.areasAtendimento.length ? servico.areasAtendimento.map(({ cidade, uf }) => `${cidade}, ${uf}`).join(" · ") : "Atendimento online"}
                 </span>
                 {servico.remoto && <span className="rounded-full bg-papel px-2.5 py-1.5">Remoto</span>}
                 {servico.presencial && <span className="rounded-full bg-papel px-2.5 py-1.5">Presencial</span>}
