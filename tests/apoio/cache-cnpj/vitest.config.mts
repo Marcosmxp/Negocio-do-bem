@@ -5,6 +5,6 @@ export default defineConfig({
   test: {
     environment: "node",
     fileParallelism: false,
-    include: ["tests/unit/cnpj.test.ts", "tests/integracao/cache-cnpj.test.ts"],
+    include: ["tests/unit/cnpj.test.ts", "tests/unit/cache-cnpj-html.test.ts", "tests/unit/cache-cnpj-arquivos.test.ts", "tests/integracao/cache-cnpj.test.ts"],
   },
 });
