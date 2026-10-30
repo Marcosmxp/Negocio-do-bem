@@ -20,7 +20,8 @@
     "municipios:atualizar": "tsx scripts/municipios-ibge.ts",
     "cidades:corrigir": "tsx scripts/corrigir-cidades.ts",
     "moderacao": "tsx scripts/moderacao.ts",
-    "marca:icones": "tsx scripts/gerar-icones.ts"
+    "marca:icones": "tsx scripts/gerar-icones.ts",
+    "cortejo:ciclos": "node scripts/gerar-ciclos.mjs > src/components/cortejo/ciclos.css"
   },
   "dependencies": {
     "@fontsource-variable/bricolage-grotesque": "5.3.0",
