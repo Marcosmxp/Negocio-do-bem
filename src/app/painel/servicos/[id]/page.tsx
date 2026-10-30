@@ -25,6 +25,7 @@ async function Conteudo({ params }: Pick<PageProps<"/painel/servicos/[id]">, "pa
   if (!idServicoValido(id)) notFound();
   const [servico, perfil, membros] = await Promise.all([
     db.servico.findFirst({
+      include: { areasAtendimento: { select: { cidade: true, uf: true } } },
       where: {
         id,
         OR: [
