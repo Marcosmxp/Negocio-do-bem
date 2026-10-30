@@ -1,0 +1,409 @@
+// Conserva o contrato HTTP e os leitores de HTML da prova unix-resume-2 da issue #37.
+import assert from "node:assert/strict";
+import { spawn } from "node:child_process";
+import { createHash, randomUUID } from "node:crypto";
+import { once } from "node:events";
+import { existsSync, lstatSync, readdirSync, readFileSync, realpathSync, statSync, utimesSync, writeFileSync } from "node:fs";
+import { createServer } from "node:http";
+import { createServer as criarTcp } from "node:net";
+import { resolve } from "node:path";
+import { setTimeout as esperar } from "node:timers/promises";
+import { pathToFileURL } from "node:url";
+import { atributo, decodificar, formularioDeEntrada, observarFila, sanitizarHtml } from "./html.mjs";
+
+const config = JSON.parse(readFileSync(process.env.CACHE_CNPJ_PROVA, "utf8"));
+const raiz = realpathSync(process.cwd());
+const destino = realpathSync(config.evidencias);
+const fixture = JSON.parse(readFileSync(config.fixture, "utf8"));
+assert.equal(fixture.synthetic, true);
+assert.equal(fixture.production, false);
+assert.equal(fixture.container, "ndb-37-2382-unix");
+assert.equal(fixture.networkMode, "none");
+assert.equal(fixture.socketDirectory, "/var/tmp/nott-native-write/negocio-37-cache-cnpj/.nott/pg");
+assert.equal(fixture.database, "negocio_do_bem_teste");
+assert.equal(fixture.port, 5432);
+assert(raiz.startsWith("/var/tmp/nott-native-write/negocio-37-cache-cnpj/.nott/"));
+assert(destino.startsWith("/var/tmp/nott-native-write/negocio-37-cache-cnpj/.nott/"));
+assert(!readdirSync(raiz).some(n => n === ".env" || n.startsWith(".env.")));
+assert(existsSync(resolve(raiz, ".next/BUILD_ID")));
+const url = new URL(`postgresql://localhost:5432/${fixture.database}`);
+url.username = fixture.user;
+url.password = fixture.password;
+url.searchParams.set("host", fixture.socketDirectory);
+url.searchParams.set("schema", "public");
+const { PrismaPg } = await import(pathToFileURL(resolve(raiz, "node_modules/@prisma/adapter-pg/dist/index.js")));
+const { PrismaClient } = await import(pathToFileURL(resolve(raiz, "src/generated/prisma/client.ts")));
+const { gerarHashSenha } = await import(pathToFileURL(resolve(raiz, "src/lib/auth/senha.ts")));
+const db = new PrismaClient({ adapter: new PrismaPg({ connectionString: url.href }) });
+const cache = resolve(raiz, ".next/cache/fetch-cache");
+const fila = "/moderacao?aba=reivindicacoes";
+const chamadas = [];
+const respostas = new Map();
+const pedidos = [];
+const registros = [];
+let servidor;
+let api;
+let origem;
+let cookie;
+let log = "";
+let moderador;
+let empresa;
+let anteriores = [];
+let codigo = 2;
+const identidade = randomUUID().replaceAll("-", "");
+const salvar = (nome, valor) => writeFileSync(resolve(destino, nome), JSON.stringify(valor, null, 2) + "\n");
+function registrar(nome, valor) {
+  registros.push({ nome, ...valor });
+  salvar("observacoes.json", registros);
+  console.log(`[PROVA37] ${nome} ${JSON.stringify(valor)}`);
+}
+const hash = bytes => createHash("sha256").update(bytes).digest("hex");
+async function aguardar(condicao, nome, limite = 15_000) {
+  const fim = Date.now() + limite;
+  do {
+    if (await condicao()) return;
+    await esperar(50);
+  } while (Date.now() < fim);
+  assert.fail(`Condição não observada: ${nome}`);
+}
+async function escutar(s) {
+  s.listen(0, "127.0.0.1");
+  await once(s, "listening");
+  return s.address().port;
+}
+async function ler(caminho = fila, autenticado = true) {
+  const r = await fetch(`${origem}${caminho}`, { headers: autenticado && cookie ? { cookie } : {}, redirect: "manual", signal: AbortSignal.timeout(30_000) });
+  return { status: r.status, html: await r.text() };
+}
+function contar(cnpj) { return chamadas.filter(c => c.cnpj === cnpj).length; }
+function publico(marcador) {
+  return { razaoSocial: marcador, nomeFantasia: "Nome fictício", situacao: "ATIVA", municipio: "Recife", uf: "PE" };
+}
+function respostaBoa(marcador) { return { tipo: "sucesso", marcador }; }
+function atender(res, estado) {
+  if (estado.tipo === "rede") { res.destroy(); return; }
+  if (estado.tipo === "timeout") return;
+  res.writeHead(estado.status ?? 200, { "Content-Type": "application/json" });
+  if (estado.tipo === "json") res.end("{inválido");
+  else res.end(JSON.stringify({ razao_social: estado.marcador, nome_fantasia: "Nome fictício", descricao_situacao_cadastral: "ATIVA", municipio: "Recife", uf: "PE", socios: "NÃO PERSISTIR" }));
+}
+async function iniciar() {
+  const reserva = criarTcp();
+  const porta = await escutar(reserva);
+  await new Promise(ok => reserva.close(ok));
+  origem = `http://127.0.0.1:${porta}`;
+  const transporte = resolve(destino, "transporte.json");
+  salvar("transporte.json", { origin: `http://127.0.0.1:${api.address().port}`, databaseSocket: `${fixture.socketDirectory}/.s.PGSQL.5432` });
+  const preload = resolve(raiz, "tests/apoio/cache-cnpj/transporte.mjs");
+  servidor = spawn(process.execPath, ["--max-old-space-size=4096", resolve(raiz, "node_modules/next/dist/bin/next"), "start", "--hostname", "127.0.0.1", "--port", String(porta)], {
+    cwd: raiz, detached: true, stdio: ["ignore", "pipe", "pipe"], env: {
+      PATH: "/usr/bin:/bin", HOME: destino, TMPDIR: destino, NODE_ENV: "production", DATABASE_URL: url.href,
+      APP_URL: origem, NEXT_TELEMETRY_DISABLED: "1", CIRCLE_NODE_TOTAL: "2", RAYON_NUM_THREADS: "2", UV_THREADPOOL_SIZE: "2",
+      NODE_OPTIONS: `--max-old-space-size=4096 --import=${preload}`, CACHE_CNPJ_TRANSPORTE: transporte,
+    },
+  });
+  servidor.stdout.on("data", b => { log += b; });
+  servidor.stderr.on("data", b => { log += b; });
+  servidor.on("error", () => { log += "PROVA37_ERRO_INICIAR"; });
+  await aguardar(async () => {
+    assert.equal(servidor.exitCode, null);
+    try { const r = await ler("/entrar", false); return r.status === 200 && r.html.includes('name="senha"'); }
+    catch { return false; }
+  }, "prontidão Next", 60_000);
+  registrar("iniciar", { pid: servidor.pid, buildId: readFileSync(resolve(raiz, ".next/BUILD_ID"), "utf8"), porta });
+}
+async function parar() {
+  if (!servidor) return;
+  const pid = servidor.pid;
+  if (servidor.exitCode === null && servidor.signalCode === null) {
+    const fim = once(servidor, "close");
+    process.kill(-pid, "SIGTERM");
+    await fim;
+  }
+  const porta = new URL(origem).port;
+  await assert.rejects(fetch(`${origem}/entrar`, { signal: AbortSignal.timeout(1000) }));
+  registrar("parar", { pid, porta, codigo: servidor.exitCode, sinal: servidor.signalCode, portaFechada: true });
+  servidor = undefined;
+}
+async function autenticar(senha, email) {
+  const pagina = `${origem}/entrar?voltar=${encodeURIComponent(fila)}`;
+  const entrada = await ler(`/entrar?voltar=${encodeURIComponent(fila)}`);
+  const formulario = formularioDeEntrada(entrada.html, pagina);
+  formulario.dados.set("email", email);
+  formulario.dados.set("senha", senha);
+  formulario.dados.set("voltar", fila);
+  const antes = await db.sessao.count({ where: { usuarioId: moderador.id } });
+  const r = await fetch(formulario.destino, { method: "POST", headers: { origin: origem }, body: formulario.dados, redirect: "manual" });
+  await r.text();
+  assert.equal(r.status, 303);
+  assert.equal(r.headers.get("location"), fila);
+  const cookies = r.headers.getSetCookie().map(c => c.split(";")[0]).filter(c => /^ndb_sessao=[A-Za-z0-9_-]+$/.test(c));
+  assert.equal(cookies.length, 1);
+  cookie = cookies[0];
+  assert.equal(await db.sessao.count({ where: { usuarioId: moderador.id } }), antes + 1);
+  registrar("login-real", { status: r.status, sessoesCriadasPelaAplicacao: 1 });
+}
+async function preparar(valores) {
+  await db.reivindicacao.updateMany({ where: { id: { in: pedidos } }, data: { status: "cancelada" } });
+  const atuais = [];
+  for (const cnpj of valores) {
+    const p = await db.reivindicacao.create({ data: { usuarioId: moderador.id, empresaId: empresa.id, metodo: "documento", cnpj,
+      relacao: "Responsável sintético", contato: "contato@exemplo.test", expiraEm: new Date(Date.now() + 86_400_000) } });
+    pedidos.push(p.id);
+    atuais.push(p);
+  }
+  return atuais;
+}
+function conferir(html, atuais, marcador) {
+  for (const p of atuais) {
+    const o = observarFila(html, empresa.nome, p.id, marcador);
+    assert(o.ficha && o.controles && o.marcadorRenderizado, "Ficha, controles e dado público devem aparecer no HTML");
+  }
+  assert(!/HARNESS37_(?:FETCH_EXTERNO_BLOQUEADO|TRANSPORTE_INVALIDO|SOCKET_EXTERNO_BLOQUEADO)|PROVA37_ERRO_INICIAR/.test(log));
+}
+function arquivosCache() {
+  if (!existsSync(cache)) return [];
+  return readdirSync(cache).map(n => resolve(cache, n));
+}
+function entrada(marcador) {
+  const encontrados = arquivosCache().filter(p => {
+    assert(!lstatSync(p).isSymbolicLink());
+    assert(realpathSync(p).startsWith(`${realpathSync(cache)}/`));
+    try {
+      const e = JSON.parse(readFileSync(p, "utf8"));
+      return e.kind === "FETCH" && JSON.parse(e.data.body).razaoSocial === marcador;
+    } catch { return false; }
+  });
+  if (!encontrados.length) return undefined;
+  assert.equal(encontrados.length, 1);
+  const caminho = encontrados[0];
+  const bytes = readFileSync(caminho);
+  const e = JSON.parse(bytes);
+  assert.equal(e.revalidate, 86400);
+  assert.deepEqual(JSON.parse(e.data.body), publico(marcador));
+  return { caminho, hash: hash(bytes), tamanho: bytes.length, mtime: statSync(caminho).mtimeMs, revalidate: e.revalidate };
+}
+async function persistido(marcador) {
+  let resultado;
+  await aguardar(() => { resultado = entrada(marcador); return !!resultado; }, "escrita FETCH íntegra");
+  return resultado;
+}
+function artefatos() {
+  const itens = {};
+  function visitar(p) {
+    if (statSync(p).isDirectory()) for (const n of readdirSync(p)) visitar(resolve(p, n));
+    else itens[p.slice(raiz.length)] = hash(readFileSync(p));
+  }
+  for (const p of [".next/BUILD_ID", ".next/server", ".next/static"]) visitar(resolve(raiz, p));
+  return itens;
+}
+let proximo = 1;
+function cnpjNovo() {
+  let base = `37990000${String(proximo++).padStart(4, "0")}`;
+  for (const pesos of [[5,4,3,2,9,8,7,6,5,4,3,2], [6,5,4,3,2,9,8,7,6,5,4,3,2]]) {
+    const resto = [...base].reduce((s, c, i) => s + Number(c) * pesos[i], 0) % 11;
+    base += resto < 2 ? 0 : 11 - resto;
+  }
+  return base;
+}
+try {
+  const [banco] = await db.$queryRaw`SELECT current_database() AS banco, host(inet_server_addr()) AS host`;
+  assert.equal(banco.banco, fixture.database);
+  assert.equal(banco.host, null);
+  assert.equal(arquivosCache().length, 0, "O armazenamento deve começar frio");
+  anteriores = await db.reivindicacao.findMany({ where: { status: "pendente" }, select: { id: true } });
+  await db.reivindicacao.updateMany({ where: { id: { in: anteriores.map(p => p.id) } }, data: { status: "cancelada" } });
+  const senha = randomUUID();
+  moderador = await db.usuario.create({ data: { nome: "Moderação sintética", email: `cache37-${identidade}@exemplo.test`, papel: "moderador", senhaHash: await gerarHashSenha(senha) } });
+  empresa = await db.empresa.create({ data: { instagramUsername: `cache37.${identidade}`, nome: `EMPRESA37${identidade}`, resumo: "Prova sintética", categoria: "outros", cidade: "Recife", uf: "PE", moderacao: "aprovada" } });
+  api = createServer((req, res) => {
+    const cnpj = req.url?.split("/").at(-1);
+    const valido = req.method === "GET" && req.url === `/api/cnpj/v1/${cnpj}` && /^[0-9A-Z]{14}$/.test(cnpj ?? "") &&
+      req.headers["user-agent"] === "NegocioDoBem/1.0 (+https://github.com/fabsreis/Negocio-do-bem)";
+    chamadas.push({ cnpj, valido });
+    salvar("chamadas.json", chamadas);
+    const estado = respostas.get(cnpj);
+    if (!valido || !estado) { res.writeHead(500); res.end(); return; }
+    if (estado.pendente) { estado.liberar = () => atender(res, estado); return; }
+    atender(res, estado);
+  });
+  await escutar(api);
+  await iniciar();
+  await autenticar(senha, moderador.email);
+  const normalizado = "11222333000181";
+  const marcador = `RECEITA37A${identidade}`;
+  respostas.set(normalizado, respostaBoa(marcador));
+  let atuais = await preparar(["11.222.333/0001-81"]);
+  for (let n = 1; n <= 2; n++) {
+    const r = await ler();
+    assert.equal(r.status, 200);
+    conferir(r.html, atuais, marcador);
+    writeFileSync(resolve(destino, `fila-${n}.html`), sanitizarHtml(r.html));
+    registrar(`get-${n}`, { chamadas: contar(normalizado), marcadorRenderizado: true, controles: true });
+  }
+  salvar("comparacao.json", { esperado: 1, observado: contar(normalizado), getsAutenticados: 2, conteudoConferido: true });
+  assert.equal(contar(normalizado), 1, "[COMPORTAMENTO37] dois carregamentos devem reutilizar o CNPJ normalizado");
+  registrar("reutiliza_sucesso_em_dois_carregamentos_da_fila", { chamadas: 1 });
+
+  const alpha = "12ABC34501DE35";
+  const marcaAlpha = `ALFA37${identidade}`;
+  respostas.set(alpha, respostaBoa(marcaAlpha));
+  atuais = await preparar(["12.ABC.345/01DE-35", "12abc34501de35", alpha]);
+  for (let n = 0; n < 2; n++) conferir((await ler()).html, atuais, marcaAlpha);
+  assert.equal(contar(alpha), 1);
+  registrar("normaliza_cnpj_alfanumerico_antes_do_cache", { fichas: 3, gets: 2, chamadas: 1 });
+  const numerico = cnpjNovo();
+  const marcaNumerico = `NUM37${identidade}`;
+  respostas.set(numerico, respostaBoa(marcaNumerico));
+  const formatado = `${numerico.slice(0,2)}.${numerico.slice(2,5)}.${numerico.slice(5,8)}/${numerico.slice(8,12)}-${numerico.slice(12)}`;
+  atuais = await preparar([formatado, numerico]);
+  conferir((await ler()).html, atuais, marcaNumerico);
+  assert.equal(contar(numerico), 1);
+  registrar("compartilha_fichas_equivalentes_na_consulta_fria", { fichas: 2, chamadas: 1, chaveDistintaDaAlfanumerica: true });
+
+  for (const falha of [403, 404, 429, 500, "json", "rede", "timeout"]) {
+    const cnpj = cnpjNovo();
+    const marca = `RECUPERA37${falha}${identidade}`;
+    atuais = await preparar([cnpj]);
+    respostas.set(cnpj, typeof falha === "number" ? { tipo: "http", status: falha } : { tipo: falha });
+    const arquivosAntes = arquivosCache().sort();
+    const inicio = Date.now();
+    const r = await ler();
+    const esperaMs = Date.now() - inicio;
+    assert(r.html.includes("Não foi possível consultar a Receita agora."));
+    assert(observarFila(r.html, empresa.nome, atuais[0].id, "ausente").controles);
+    assert.equal(contar(cnpj), 1);
+    assert.deepEqual(arquivosCache().sort(), arquivosAntes, "Falha fria não pode produzir entrada diária");
+    if (falha === "timeout") assert(esperaMs >= 4900, "O timeout deve alcançar o limite real de cinco segundos");
+    respostas.set(cnpj, respostaBoa(marca));
+    for (let n = 0; n < 2; n++) conferir((await ler()).html, atuais, marca);
+    assert.equal(contar(cnpj), 2);
+    registrar(`falha-fria-${falha}`, { aviso: true, controles: true, recuperou: true, chamadas: 2, esperaMs, entradasNaFalha: 0 });
+  }
+
+  const streamCnpj = cnpjNovo();
+  const streamMarca = `STREAM37${identidade}`;
+  atuais = await preparar([streamCnpj]);
+  const pendente = { ...respostaBoa(streamMarca), pendente: true };
+  respostas.set(streamCnpj, pendente);
+  const streaming = await fetch(`${origem}${fila}`, { headers: { cookie }, signal: AbortSignal.timeout(30_000) });
+  const leitor = streaming.body.getReader();
+  let parcial = "";
+  while (!parcial.includes("Consultando a Receita") || !parcial.includes('name="motivo"')) {
+    const parte = await leitor.read();
+    assert(!parte.done);
+    parcial += new TextDecoder().decode(parte.value);
+  }
+  assert(!parcial.includes(streamMarca));
+  await aguardar(() => !!pendente.liberar, "consulta pendente");
+  registrar("streaming", { fallbackAntesDoDado: true, controlesAntesDoDado: true });
+  pendente.liberar();
+  for (;;) { const p = await leitor.read(); if (p.done) break; parcial += new TextDecoder().decode(p.value); }
+  conferir(parcial, atuais, streamMarca);
+
+  const hashes = artefatos();
+  salvar("build-sha256.json", hashes);
+  for (const falha of ["sucesso", "http", "json", "rede", "timeout"]) {
+    const cnpj = cnpjNovo();
+    const a = `TEMPO37A${falha}${identidade}`;
+    const b = `TEMPO37B${falha}${identidade}`;
+    atuais = await preparar([cnpj]);
+    respostas.set(cnpj, respostaBoa(a));
+    conferir((await ler()).html, atuais, a);
+    const entradaA = await persistido(a);
+    assert.equal(contar(cnpj), 1);
+    await parar();
+    assert.deepEqual(entrada(a), entradaA);
+    respostas.set(cnpj, respostaBoa(b));
+    await iniciar();
+    conferir((await ler()).html, atuais, a);
+    assert.equal(contar(cnpj), 1);
+    registrar(`reinicio-fresco-${falha}`, { chamadas: 1, entrada: entradaA });
+    await parar();
+    const antes = new Map(arquivosCache().map(p => [p, { hash: hash(readFileSync(p)), mtime: statSync(p).mtimeMs }]));
+    const st = statSync(entradaA.caminho);
+    utimesSync(entradaA.caminho, st.atime, new Date(st.mtimeMs - 86_460_000));
+    const velha = entrada(a);
+    assert.equal(velha.hash, entradaA.hash);
+    assert.equal(velha.tamanho, entradaA.tamanho);
+    assert(Math.abs(velha.mtime - (entradaA.mtime - 86_460_000)) < 2);
+    assert(Date.now() - velha.mtime > 86_400_000);
+    for (const [p, dados] of antes) {
+      assert.equal(hash(readFileSync(p)), dados.hash);
+      if (p !== entradaA.caminho) assert.equal(statSync(p).mtimeMs, dados.mtime);
+    }
+    assert.deepEqual(artefatos(), hashes);
+    const estado = { tipo: falha, status: falha === "http" ? 500 : undefined, marcador: b, pendente: true };
+    respostas.set(cnpj, estado);
+    await iniciar();
+    const inicioLog = log.length;
+    const stale = await ler();
+    conferir(stale.html, atuais, a);
+    await aguardar(() => !!estado.liberar, "revalidação iniciada");
+    assert.equal(contar(cnpj), 2);
+    estado.liberar();
+    if (falha !== "sucesso") {
+      await aguardar(() => log.slice(inicioLog).split("\n").some(l => l.includes("revalidating cache with key:") && l.includes(cnpj)), "rejeição nativa da revalidação", 15_000);
+      assert.deepEqual(entrada(a), velha);
+      registrar(`revalidacao-rejeitada-${falha}`, { chamadas: 2, preservou: velha, rejeicaoNativaDaChave: true });
+      respostas.set(cnpj, respostaBoa(b));
+      conferir((await ler()).html, atuais, a);
+    }
+    const nova = await persistido(b);
+    assert.equal(nova.caminho, velha.caminho);
+    assert(nova.mtime > velha.mtime + 86_400_000);
+    conferir((await ler()).html, atuais, b);
+    assert.equal(contar(cnpj), falha === "sucesso" ? 2 : 3);
+    assert.deepEqual(artefatos(), hashes);
+    registrar(`revalidacao-${falha}`, { chamadas: contar(cnpj), mesmaChave: true, ttl: 86400, buildInalterado: true, entrada: nova });
+  }
+
+  const ultimo = atuais[0];
+  const novasNotas = `BANCO37${identidade}`;
+  await db.reivindicacao.update({ where: { id: ultimo.id }, data: { notas: novasNotas } });
+  const antesBanco = chamadas.length;
+  const r = await ler();
+  assert(sanitizarHtml(r.html).includes(novasNotas));
+  assert.equal(chamadas.length, antesBanco);
+  registrar("banco-atualizado", { notasNovasRenderizadas: true, novasConsultasPublicas: 0 });
+  const forms = [...r.html.matchAll(/<form\b([^>]*)>([\s\S]*?)<\/form>/gi)];
+  const form = forms.find(m => m[2].includes('name="motivo"') && m[2].includes(`value="${ultimo.id}"`));
+  assert(form);
+  const dados = new FormData();
+  for (const m of form[2].matchAll(/<input\b[^>]*>/gi)) {
+    const nome = atributo(m[0], "name");
+    if (nome) dados.append(nome, atributo(m[0], "value") ?? "");
+  }
+  dados.set("motivo", "Recusa sintética que deve ser negada");
+  const antesPermissao = { pedido: await db.reivindicacao.findUnique({ where: { id: ultimo.id } }), auditoria: await db.registroAuditoria.count(), membros: await db.empresaMembro.count() };
+  await db.usuario.update({ where: { id: moderador.id }, data: { papel: "membro" } });
+  const negado = await ler();
+  const visivel = decodificar(sanitizarHtml(negado.html));
+  assert(!visivel.includes(empresa.nome) && !visivel.includes(novasNotas) && !visivel.includes('name="motivo"') && !visivel.includes(`value="${ultimo.id}"`));
+  assert(!visivel.includes(`TEMPO37Btimeout${identidade}`));
+  const decisao = await fetch(new URL(atributo(form[1], "action") || fila, origem), { method: "POST", headers: { cookie, origin: origem }, body: dados, redirect: "manual" });
+  const htmlDecisao = sanitizarHtml(await decisao.text());
+  assert(!htmlDecisao.includes(empresa.nome) && !htmlDecisao.includes('name="motivo"'));
+  assert.deepEqual({ pedido: await db.reivindicacao.findUnique({ where: { id: ultimo.id } }), auditoria: await db.registroAuditoria.count(), membros: await db.empresaMembro.count() }, antesPermissao);
+  assert.equal(chamadas.length, antesBanco);
+  registrar("autorizacao-revogada", { mesmaSessao: true, conteudoNegado: true, formularioAnteriorNegado: true, mutacoes: 0, statusGet: negado.status, statusPost: decisao.status });
+  assert(chamadas.every(c => c.valido));
+  codigo = 0;
+} catch (erro) {
+  const falha = erro instanceof assert.AssertionError ? { nome: erro.name, mensagem: erro.message, esperado: erro.expected, observado: erro.actual } : { nome: erro?.name ?? "unknown", mensagem: "Falha do harness. Consulte a etapa registrada." };
+  salvar("falha.json", falha);
+  console.error(JSON.stringify(falha));
+  codigo = erro instanceof assert.AssertionError ? 1 : 2;
+} finally {
+  await parar();
+  if (api?.listening) { api.closeAllConnections(); await new Promise(ok => api.close(ok)); }
+  if (moderador) {
+    await db.usuario.update({ where: { id: moderador.id }, data: { papel: "membro" } });
+    await db.reivindicacao.updateMany({ where: { id: { in: pedidos } }, data: { status: "cancelada" } });
+  }
+  await db.reivindicacao.updateMany({ where: { id: { in: anteriores.map(p => p.id) } }, data: { status: "pendente" } });
+  await db.$disconnect();
+  writeFileSync(resolve(destino, "next.log"), log.replace(/ndb_sessao=[^;\s]+/g, "ndb_sessao=[omitido]"));
+  registrar("encerramento", { servidorParado: !servidor, respondedorParado: !api?.listening, clienteBancoFechado: true, codigo });
+}
+process.exitCode = codigo;
