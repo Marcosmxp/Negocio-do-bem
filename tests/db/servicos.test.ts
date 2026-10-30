@@ -54,6 +54,36 @@ describe("integridade e visibilidade dos serviços", () => {
     expect(await db.servico.count({ where: filtro })).toBe(0);
   });
 
+  it("respeita a área de atendimento sem confundir a origem com a cidade pesquisada", async () => {
+    const { anuncio } = await perfilEAnuncio();
+    await db.servico.update({
+      where: { id: anuncio.id },
+      data: {
+        presencial: true,
+        areasAtendimento: { create: [{ cidade: "Olinda", uf: "PE" }] },
+      },
+    });
+    // O prestador fica em Recife, mas o serviço presencial atende Olinda.
+    const olinda = { cidade: "Olinda", uf: "PE" };
+    const recife = { cidade: "Recife", uf: "PE" };
+    expect(await db.servico.count({ where: filtroServicosPublicos("", "", olinda, "presencial") })).toBe(1);
+    expect(await db.servico.count({ where: filtroServicosPublicos("", "", recife, "presencial") })).toBe(0);
+    // Remoto continua disponível independentemente da cidade pesquisada.
+    expect(await db.servico.count({ where: filtroServicosPublicos("", "", recife, "remoto") })).toBe(1);
+    expect(await db.servico.count({ where: filtroServicosPublicos("", "", recife) })).toBe(1);
+  });
+
+  it("a suspensão tira a publicação e exige motivo no banco", async () => {
+    const { anuncio } = await perfilEAnuncio();
+    await expect(db.servico.update({
+      where: { id: anuncio.id }, data: { status: "suspenso", motivoSuspensao: null },
+    })).rejects.toThrow();
+    await db.servico.update({
+      where: { id: anuncio.id }, data: { status: "suspenso", motivoSuspensao: "Anúncio em desacordo com as regras." },
+    });
+    expect(await db.servico.count({ where: filtroServicosPublicos("", "") })).toBe(0);
+  });
+
   it("não publica serviço pendente, rejeitado ou oculto", async () => {
     const { anuncio } = await perfilEAnuncio();
     const filtro = filtroServicosPublicos("", "");
