@@ -963,3 +963,15 @@ Os [próximos passos do README](../README.md#próximos-passos-sugeridos) listam 
 - O catálogo usa pesquisa textual normalizada por até seis termos, categoria, 18 resultados por página e ordenação por data e identificador. A paginação verifica os limites contra o total antes de consultar a página.
 - A interface mantém a paleta da marca e o modo escuro. Perfis, anúncios e revisão estão integrados ao painel do usuário e à moderação.
 - **Fora do escopo:** propostas, contratos, pagamentos, mensagens, avaliações, denúncias específicas dos anúncios e histórico de negociações. Esses fluxos exigem discussão e PRs separados.
+
+
+## Issue #40 — Áreas de atendimento, pesquisa e suspensão de serviços
+
+- A cidade do prestador representa sua localização de origem. Os municípios atendidos presencialmente ficam associados a cada serviço em `AreaAtendimentoServico`, sem copiar o endereço postal do negócio.
+- Cada anúncio presencial informa pelo menos um município brasileiro validado pela lista atual de municípios; limite de 10 por anúncio. Serviços exclusivamente remotos não precisam informar municípios.
+- A pesquisa pública admite texto, categoria, município e modalidade. Ao escolher município sem restringir modalidade, aparecem serviços remotos e serviços presenciais que declarem atender o município. Ao selecionar `presencial`, aparecem apenas as áreas correspondentes; `remoto` lista serviços online.
+- Localizações inválidas não removem silenciosamente o filtro: o catálogo mostra aviso e zero resultados. O mesmo filtro de visibilidade é usado em `count` e `findMany`.
+- Alterar o perfil profissional retira os anúncios publicados para nova análise quando muda informação pública, sem deixar a cidade antiga nas colunas de origem. O campo textual de busca de serviços indexa o conteúdo do anúncio, não a cidade de origem do prestador.
+- Moderadores podem suspender anúncios `publicado` com justificativa obrigatória, preservando a linha, o motivo e o registro de auditoria. Um anúncio suspenso não aparece no catálogo e só regressa após edição e nova aprovação.
+- A publicidade dos contatos do profissional continua sujeita à escolha de publicar o perfil. A área de atendimento inclui somente municípios/UF, nunca CEP ou endereço postal.
+- Os contratos futuros com endereços estruturados (#158/#168) e confirmação de donos (#133/#134, PRs #136/#137) devem ser alinhados antes de integrar as respectivas funcionalidades. Não duplicar cadastros nem expor dados privados.
