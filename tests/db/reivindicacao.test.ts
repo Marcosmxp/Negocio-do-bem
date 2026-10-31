@@ -1,3 +1,5 @@
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { db, type Prisma } from "@/lib/db";
 import {
@@ -536,5 +538,76 @@ describe("documento e moderação", () => {
     await expect(solicitarPorDocumento({ empresaId: empresa.id, usuarioId: dono.id, ...dadosDoNegocio })).rejects.toThrow(
       /já é dono/,
     );
+  });
+});
+
+describe("selo de perfil oficial", () => {
+  it("a moderação aprova pedido antigo por DM e mantém o selo ao adicionar um dono", async () => {
+    const [confirmou, socia, moderador] = await Promise.all([criarUsuario(), criarUsuario(), criarUsuario()]);
+    const empresa = await criarEmpresa("selo.dm");
+    const antigo = await db.reivindicacao.create({
+      data: { empresaId: empresa.id, usuarioId: confirmou.id, metodo: "codigo_dm", expiraEm: new Date() },
+    });
+    await aprovar({ reivindicacaoId: antigo.id, revisorId: moderador.id });
+    expect(await db.empresa.findUniqueOrThrow({ where: { id: empresa.id } })).toMatchObject({ oficial: true });
+    const pedido = await solicitarPorDocumento({
+      empresaId: empresa.id, usuarioId: socia.id, cnpj: null, site: null, relacao: "Sócia", contato: "contato", mensagem: null,
+    });
+    await aprovar({ reivindicacaoId: pedido.id, revisorId: moderador.id });
+    expect(await db.empresa.findUniqueOrThrow({ where: { id: empresa.id } })).toMatchObject({ oficial: true });
+  });
+
+  it("a transferência por dados retira o selo de quem saiu", async () => {
+    const [confirmou, novo, moderador] = await Promise.all([criarUsuario(), criarUsuario(), criarUsuario()]);
+    const empresa = await criarEmpresa("selo.transferencia");
+    await processarLoginInstagram({ empresaId: empresa.id, usuarioId: confirmou.id,
+      conta: { userId: "selo-id", username: empresa.instagramUsername } });
+    const pedido = await solicitarPorDocumento({
+      empresaId: empresa.id, usuarioId: novo.id, cnpj: null, site: null, relacao: "Dono", contato: "contato", mensagem: null,
+    });
+    await aprovar({ reivindicacaoId: pedido.id, revisorId: moderador.id, modo: "transferir" });
+    expect(await donos(empresa.id)).toEqual([novo.id]);
+    expect(await db.empresa.findUniqueOrThrow({ where: { id: empresa.id } })).toMatchObject({ oficial: false });
+  });
+});
+
+describe("migração do perfil oficial", () => {
+  /** O UPDATE da migração que liga o selo nos negócios que já existiam. */
+  function sqlDoPreenchimento(): string {
+    const pasta = join("prisma", "migrations");
+    const migracao = readdirSync(pasta).find((nome) => nome.endsWith("_perfil_oficial"));
+    if (!migracao) throw new Error("A migração do perfil oficial não existe.");
+    const sql = readFileSync(join(pasta, migracao, "migration.sql"), "utf8");
+    const inicio = sql.indexOf('UPDATE "Empresa"');
+    if (inicio < 0) throw new Error("A migração do perfil oficial não preenche os negócios que já existem.");
+    return sql.slice(inicio, sql.indexOf(";", inicio) + 1);
+  }
+
+  it("liga o selo só onde quem confirmou pelo Instagram continua dono", async () => {
+    const [dm, login, documento, saiu, ficou] = await Promise.all(
+      ["Dm", "Login", "Documento", "Saiu", "Ficou"].map((nome) => criarUsuario(nome)),
+    );
+    const porDm = await criarEmpresa("migra.dm");
+    const porLogin = await criarEmpresa("migra.login");
+    const porDocumento = await criarEmpresa("migra.documento");
+    const transferida = await criarEmpresa("migra.transferida");
+    const aprovada = (empresaId: string, usuarioId: string, metodo: string) =>
+      db.reivindicacao.create({ data: { empresaId, usuarioId, metodo, status: "aprovada", expiraEm: new Date() } });
+    const dono = (empresaId: string, usuarioId: string) => db.empresaMembro.create({ data: { empresaId, usuarioId } });
+    await aprovada(porDm.id, dm.id, "codigo_dm");
+    await dono(porDm.id, dm.id);
+    await aprovada(porLogin.id, login.id, "instagram_login");
+    await dono(porLogin.id, login.id);
+    await aprovada(porDocumento.id, documento.id, "documento");
+    await dono(porDocumento.id, documento.id);
+    // Quem confirmou pelo Instagram saiu numa transferência para quem enviou os dados.
+    await aprovada(transferida.id, saiu.id, "codigo_dm");
+    await aprovada(transferida.id, ficou.id, "documento");
+    await dono(transferida.id, ficou.id);
+
+    await db.$executeRawUnsafe(sqlDoPreenchimento());
+
+    const oficiais = await db.empresa.findMany({ where: { oficial: true }, select: { instagramUsername: true } });
+    expect(oficiais.map((e) => e.instagramUsername).sort()).toEqual(["migra.dm", "migra.login"]);
   });
 });

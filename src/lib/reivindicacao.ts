@@ -90,7 +90,7 @@ export async function processarLoginInstagram(params: {
   if (conta.username !== empresa.instagramUsername) {
     return { tipo: "conta_diferente", conectada: conta.username };
   }
-  if (empresa.membros.some((m) => m.usuarioId === usuarioId)) {
+  if (empresa.oficial && empresa.membros.some((m) => m.usuarioId === usuarioId)) {
     return { tipo: "verificada" };
   }
 
@@ -261,6 +261,8 @@ export async function aprovar(params: {
     if (modo === "transferir") {
       await tx.empresaMembro.deleteMany({ where: { empresaId, usuarioId: { not: usuarioId } } });
     }
+    const peloInstagram = reivindicacao.metodo === "instagram_login" || reivindicacao.metodo === "codigo_dm";
+    const outrosDonos = await tx.empresaMembro.count({ where: { empresaId, usuarioId: { not: usuarioId } } });
     await tx.empresaMembro.upsert({
       where: { empresaId_usuarioId: { empresaId, usuarioId } },
       create: { empresaId, usuarioId, papel: "dono" },
@@ -286,6 +288,7 @@ export async function aprovar(params: {
       data: {
         status: "verificada",
         moderacao: "aprovada",
+        ...(peloInstagram ? { oficial: true } : outrosDonos === 0 ? { oficial: false } : {}),
         ...(instagramUserId ? { instagramUserId } : {}),
         ...(instagramIgsid ? { instagramIgsid } : {}),
       },
