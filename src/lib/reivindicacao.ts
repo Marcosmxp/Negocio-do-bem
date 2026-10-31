@@ -85,7 +85,7 @@ export async function processarLoginInstagram(params: {
 }): Promise<ResultadoLoginInstagram> {
   const { empresaId, usuarioId, conta } = params;
   const empresa = await db.empresa.findUnique({ where: { id: empresaId }, include: { membros: true } });
-  if (!empresa) throw new ErroReivindicacao("Negócio não encontrado.");
+  if (!empresa || empresa.moderacao === "rejeitada") throw new ErroReivindicacao("Negócio não encontrado.");
 
   if (conta.username !== empresa.instagramUsername) {
     return { tipo: "conta_diferente", conectada: conta.username };
@@ -257,6 +257,12 @@ export async function aprovar(params: {
     // Só pedidos antigos por código de DM trazem o IGSID de quem mandou a DM.
     const { empresaId, usuarioId, instagramIgsid } = reivindicacao;
     const instagramUserId = params.instagramUserId ?? reivindicacao.instagramUserId;
+
+    if (revisorId === null && reivindicacao.metodo === "instagram_login") {
+      const empresas = await tx.$queryRaw<{ id: string }[]>`
+        SELECT id FROM "Empresa" WHERE id = ${empresaId} AND moderacao <> 'rejeitada' FOR UPDATE`;
+      if (empresas.length === 0) throw new ErroReivindicacao("Negócio não encontrado.");
+    }
 
     if (modo === "transferir") {
       await tx.empresaMembro.deleteMany({ where: { empresaId, usuarioId: { not: usuarioId } } });

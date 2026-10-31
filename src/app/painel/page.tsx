@@ -118,7 +118,7 @@ async function Conteudo({ searchParams }: Pick<PageProps<"/painel">, "searchPara
 
       {reivindicacoes.length > 0 && (
         <section>
-          <h2 className="font-serif text-2xl font-semibold">Minhas solicitações de reivindicação</h2>
+          <h2 className="font-serif text-2xl font-semibold">Minhas solicitações</h2>
           <ul className="cartao mt-4 divide-y divide-linha">
             {reivindicacoes.map((r) => (
               <li key={r.id} className="flex flex-col gap-1 p-4 sm:flex-row sm:items-center sm:justify-between">

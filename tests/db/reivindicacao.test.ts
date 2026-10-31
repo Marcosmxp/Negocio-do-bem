@@ -1,7 +1,10 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { NextRequest } from "next/server";
+import { GET as iniciarInstagram } from "@/app/api/instagram/entrar/route";
 import { db, type Prisma } from "@/lib/db";
+import * as instagram from "@/lib/instagram";
 import {
   aprovar,
   aprovarPendentesSemDono,
@@ -78,6 +81,52 @@ describe("pedidos antigos por código de DM", () => {
 });
 
 describe("Entrar com Instagram", () => {
+  it("bloqueia a rota direta para negócio retirado do ar", async () => {
+    const dono = await criarUsuario();
+    const empresa = await criarEmpresa("rota.rejeitada");
+    await db.empresaMembro.create({ data: { empresaId: empresa.id, usuarioId: dono.id } });
+    await db.empresa.update({ where: { id: empresa.id }, data: { moderacao: "rejeitada" } });
+    const config = vi.spyOn(instagram, "configLogin");
+    try {
+      const resposta = await iniciarInstagram(new NextRequest(`http://localhost/api/instagram/entrar?empresa=${empresa.id}`));
+      expect(resposta.headers.get("location")).toBe("http://localhost/");
+      expect(config).not.toHaveBeenCalled();
+      expect(await db.reivindicacao.count()).toBe(0);
+      await expect(processarLoginInstagram({ empresaId: empresa.id, usuarioId: dono.id,
+        conta: { userId: "id-rejeitada", username: empresa.instagramUsername } })).rejects.toBeInstanceOf(ErroReivindicacao);
+      expect(await db.empresa.findUniqueOrThrow({ where: { id: empresa.id } })).toMatchObject({ moderacao: "rejeitada", oficial: false });
+    } finally {
+      vi.restoreAllMocks();
+    }
+  });
+
+  it("não aprova automaticamente se a moderação retirar o negócio após o início", async () => {
+    const dono = await criarUsuario();
+    const empresa = await criarEmpresa("mudou.moderacao");
+    await db.empresaMembro.create({ data: { empresaId: empresa.id, usuarioId: dono.id } });
+    const transacionar = db.$transaction.bind(db);
+    let transacoes = 0;
+    vi.spyOn(db, "$transaction").mockImplementation(async (operacao, opcoes) => {
+      const resultado = await transacionar(operacao, opcoes);
+      if (++transacoes === 1) {
+        await db.empresa.update({ where: { id: empresa.id }, data: { moderacao: "rejeitada" } });
+      }
+      return resultado;
+    });
+    try {
+      await expect(processarLoginInstagram({ empresaId: empresa.id, usuarioId: dono.id,
+        conta: { userId: "id-mudou", username: empresa.instagramUsername } })).rejects.toBeInstanceOf(ErroReivindicacao);
+      expect(await db.empresa.findUniqueOrThrow({ where: { id: empresa.id } })).toMatchObject({ moderacao: "rejeitada", oficial: false });
+      expect(await db.reivindicacao.findFirstOrThrow({ where: { empresaId: empresa.id } })).toMatchObject({ status: "pendente" });
+    } finally {
+      vi.restoreAllMocks();
+    }
+    const moderador = await criarUsuario("Moderação");
+    const pedido = await db.reivindicacao.findFirstOrThrow({ where: { empresaId: empresa.id } });
+    await aprovar({ reivindicacaoId: pedido.id, revisorId: moderador.id });
+    expect(await db.empresa.findUniqueOrThrow({ where: { id: empresa.id } })).toMatchObject({ moderacao: "aprovada", oficial: true });
+  });
+
   it("confirma pelo Instagram o perfil já assumido pelo mesmo dono", async () => {
     const dono = await criarUsuario();
     const empresa = await criarEmpresa("perfil.assumido");
