@@ -41,9 +41,9 @@ export async function GET(request: NextRequest) {
     const resultado = await processarLoginInstagram({ empresaId: empresaId!, usuarioId: usuario.id, conta });
 
     if (resultado.tipo === "verificada") return voltar("verificada", {}, `/empresas/${empresa.instagramUsername}`);
-    if (resultado.tipo === "em_analise") {
+    if (resultado.tipo === "em_analise" || resultado.tipo === "em_analise_fora_do_ar") {
       after(() => avisarNovaReivindicacao(empresaId!));
-      return voltar("em_analise");
+      return voltar("em_analise", {}, resultado.tipo === "em_analise_fora_do_ar" ? "/painel" : caminho);
     }
     return voltar("ig_conta_diferente", { conectada: resultado.conectada });
   } catch (erro) {

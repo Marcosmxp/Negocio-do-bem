@@ -524,7 +524,7 @@ O que a moderação confere: se o CNPJ, o site e o contato batem com o @ do Inst
 6. Cancela os **outros pedidos pendentes da mesma pessoa** para o mesmo negócio. Pedidos de **outras pessoas** para o mesmo negócio continuam pendentes, e a moderação decide cada um.
 7. Registra na auditoria `reivindicacao.aprovada` ou `reivindicacao.aprovada_com_transferencia`.
 
-**Login do Instagram:** um negócio retirado do ar não aceita o início do login. A aprovação automática confere a moderação de novo e trava o negócio até a decisão. Só a moderação pode aprovar o pedido se o negócio tiver sido retirado do ar.
+**Login do Instagram:** um negócio retirado do ar não aceita o início do login. A aprovação automática confere a moderação de novo e trava o negócio até a decisão. Se o negócio for retirado do ar depois da criação do pedido, ele continua pendente e conta na cota. O retorno agenda o aviso normal à moderação e leva a pessoa ao painel com a confirmação de que o pedido está em análise. Só a moderação pode aprovar esse pedido.
 
 **Selo oficial:** aprovar um pedido pelo login do Instagram ou um pedido antigo por DM marca `oficial = true`. Ao aprovar pelos dados, o selo continua se outro dono permanece. Se nenhum outro dono permanece, o selo é retirado. A migração marca como oficiais os negócios cujo dono atual tem um pedido aprovado pelo Instagram ou por DM.
 

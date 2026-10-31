@@ -2,6 +2,22 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
+import { createElement } from "react";
+import { renderToReadableStream } from "react-dom/server";
+import { GET as retornoInstagram } from "@/app/api/instagram/retorno/route";
+import Painel from "@/app/painel/page";
+import * as notificacoes from "@/lib/notificacoes";
+
+const contexto = vi.hoisted(() => ({ usuario: null as null | { id: string; nome: string; email: string; emailConfirmado: boolean }, tarefas: [] as (() => unknown)[] }));
+vi.mock("@/lib/auth/sessao", async (original) => ({
+  ...(await original<typeof import("@/lib/auth/sessao")>()),
+  usuarioAtual: async () => contexto.usuario,
+  exigirUsuario: async () => contexto.usuario,
+}));
+vi.mock("next/server", async (original) => ({
+  ...(await original<typeof import("next/server")>()),
+  after: (tarefa: () => unknown) => contexto.tarefas.push(tarefa),
+}));
 import { GET as iniciarInstagram } from "@/app/api/instagram/entrar/route";
 import { db, type Prisma } from "@/lib/db";
 import * as instagram from "@/lib/instagram";
@@ -115,7 +131,7 @@ describe("Entrar com Instagram", () => {
     });
     try {
       await expect(processarLoginInstagram({ empresaId: empresa.id, usuarioId: dono.id,
-        conta: { userId: "id-mudou", username: empresa.instagramUsername } })).rejects.toBeInstanceOf(ErroReivindicacao);
+        conta: { userId: "id-mudou", username: empresa.instagramUsername } })).resolves.toEqual({ tipo: "em_analise_fora_do_ar" });
       expect(await db.empresa.findUniqueOrThrow({ where: { id: empresa.id } })).toMatchObject({ moderacao: "rejeitada", oficial: false });
       expect(await db.reivindicacao.findFirstOrThrow({ where: { empresaId: empresa.id } })).toMatchObject({ status: "pendente" });
     } finally {
@@ -125,6 +141,48 @@ describe("Entrar com Instagram", () => {
     const pedido = await db.reivindicacao.findFirstOrThrow({ where: { empresaId: empresa.id } });
     await aprovar({ reivindicacaoId: pedido.id, revisorId: moderador.id });
     expect(await db.empresa.findUniqueOrThrow({ where: { id: empresa.id } })).toMatchObject({ moderacao: "aprovada", oficial: true });
+  });
+
+  it("no retorno do Instagram mantém o pedido e avisa quando a moderação retira o negócio", async () => {
+    const pessoa = await criarUsuario();
+    const empresa = await criarEmpresa("retorno.moderacao");
+    contexto.usuario = { id: pessoa.id, nome: pessoa.nome, email: pessoa.email, emailConfirmado: true };
+    contexto.tarefas = [];
+    vi.spyOn(instagram, "configLogin").mockReturnValue({ appId: "app", appSecret: "teste", redirectUri: "http://localhost/api/instagram/retorno" });
+    vi.spyOn(instagram, "trocarCodigoPorToken").mockResolvedValue("token");
+    vi.spyOn(instagram, "buscarContaConectada").mockResolvedValue({ userId: "id-retorno", username: empresa.instagramUsername });
+    const aviso = vi.spyOn(notificacoes, "avisarNovaReivindicacao").mockResolvedValue(undefined);
+    const transacionar = db.$transaction.bind(db);
+    let transacoes = 0;
+    vi.spyOn(db, "$transaction").mockImplementation(async (operacao, opcoes) => {
+      const resultado = await transacionar(operacao, opcoes);
+      if (++transacoes === 1) await db.empresa.update({ where: { id: empresa.id }, data: { moderacao: "rejeitada" } });
+      return resultado;
+    });
+    try {
+      const requisicao = new NextRequest("http://localhost/api/instagram/retorno?state=estado&code=codigo", {
+        headers: { cookie: `${instagram.COOKIE_ESTADO}=estado.${empresa.id}` },
+      });
+      const resposta = await retornoInstagram(requisicao);
+      expect(resposta.headers.get("location")).toBe("http://localhost/painel?aviso=em_analise");
+      expect(await db.reivindicacao.findMany({ where: { empresaId: empresa.id } })).toMatchObject([{ usuarioId: pessoa.id, status: "pendente" }]);
+      expect(await db.empresa.findUniqueOrThrow({ where: { id: empresa.id } })).toMatchObject({ moderacao: "rejeitada", oficial: false, instagramUserId: null });
+      expect(await donos(empresa.id)).toEqual([]);
+      expect(contexto.tarefas).toHaveLength(1);
+      await contexto.tarefas[0]();
+      expect(aviso).toHaveBeenCalledOnce();
+      expect(aviso).toHaveBeenCalledWith(empresa.id);
+      const pagina = createElement(Painel, { params: Promise.resolve({}), searchParams: Promise.resolve({ aviso: "em_analise" }) });
+      const stream = await renderToReadableStream(pagina);
+      const html = await new Response(stream).text();
+      expect(html).toContain("Recebemos sua solicitação. A moderação vai analisar");
+      expect(html).toContain("Minhas solicitações");
+      expect(html).toContain(empresa.nome);
+    } finally {
+      vi.restoreAllMocks();
+      contexto.usuario = null;
+      contexto.tarefas = [];
+    }
   });
 
   it("confirma pelo Instagram o perfil já assumido pelo mesmo dono", async () => {

@@ -24,6 +24,7 @@ const LIMITE_SOLICITACOES_POR_DIA = 10;
 
 /** Erro com mensagem que pode ser mostrada para a pessoa. */
 export class ErroReivindicacao extends Error {}
+class NegocioRetiradoDoAr extends ErroReivindicacao {}
 
 function daquiA(ms: number): Date {
   return new Date(Date.now() + ms);
@@ -75,6 +76,7 @@ async function exigirLimiteDiario(tx: Prisma.TransactionClient, usuarioId: strin
 export type ResultadoLoginInstagram =
   | { tipo: "verificada" }
   | { tipo: "em_analise" }
+  | { tipo: "em_analise_fora_do_ar" }
   | { tipo: "conta_diferente"; conectada: string };
 
 /** Recebe a conta que o Instagram confirmou no login e decide o que fazer. */
@@ -118,7 +120,12 @@ export async function processarLoginInstagram(params: {
   });
 
   if (conflitos.length > 0) return { tipo: "em_analise" };
-  await aprovar({ reivindicacaoId: reivindicacao.id, revisorId: null });
+  try {
+    await aprovar({ reivindicacaoId: reivindicacao.id, revisorId: null });
+  } catch (erro) {
+    if (erro instanceof NegocioRetiradoDoAr) return { tipo: "em_analise_fora_do_ar" };
+    throw erro;
+  }
   return { tipo: "verificada" };
 }
 
@@ -261,7 +268,7 @@ export async function aprovar(params: {
     if (revisorId === null && reivindicacao.metodo === "instagram_login") {
       const empresas = await tx.$queryRaw<{ id: string }[]>`
         SELECT id FROM "Empresa" WHERE id = ${empresaId} AND moderacao <> 'rejeitada' FOR UPDATE`;
-      if (empresas.length === 0) throw new ErroReivindicacao("Negócio não encontrado.");
+      if (empresas.length === 0) throw new NegocioRetiradoDoAr("Negócio não encontrado.");
     }
 
     if (modo === "transferir") {
