@@ -68,7 +68,7 @@ export function Vitrine({
       </div>
 
       {itens.length > 0 ? (
-        <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {itens.map((empresa) => (
             <EmpresaCard key={empresa.instagramUsername} empresa={empresa} />
           ))}
@@ -77,7 +77,7 @@ export function Vitrine({
         <div className="cartao mt-5 px-6 py-14 text-center">
           <p className="font-serif text-2xl">Ainda não há negócios aqui no diretório.</p>
           <p className="mx-auto mt-2 max-w-md text-suave">Conhece algum? Indique e ajude a comunidade a encontrá-lo.</p>
-          <Link href="/indicar" className="botao-coral mt-6">
+          <Link href="/participar" className="botao-coral mt-6">
             Indicar um negócio
           </Link>
         </div>
@@ -91,7 +91,7 @@ export function Vitrine({
         </div>
       )}
 
-      {children && <div className="mt-14 grid gap-8 lg:grid-cols-2">{children}</div>}
+      {children && <div className="mt-14 grid grid-cols-1 gap-8 lg:grid-cols-2">{children}</div>}
     </div>
   );
 }
@@ -127,7 +127,7 @@ export function VitrineCarregando() {
       <div className="h-5 w-48 animate-pulse rounded-full bg-superficie" />
       <div className="mt-8 h-12 w-96 max-w-full animate-pulse rounded-2xl bg-superficie" />
       <div className="mt-4 h-16 w-[36rem] max-w-full animate-pulse rounded-2xl bg-superficie" />
-      <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {Array.from({ length: 6 }, (_, i) => (
           <div key={i} className="h-60 animate-pulse rounded-3xl bg-superficie" />
         ))}

@@ -10,7 +10,7 @@ import {
   buscaServico, esquemaModeracaoServico, esquemaPerfilProfissional,
   esquemaServico, idServicoValido,
 } from "@/lib/servicos";
-import { identificarPrestador, podeGerirServico } from "@/lib/servicos/permissoes";
+import { filtroDePropriedadeServico, identificarPrestador, podeGerirServico } from "@/lib/servicos/permissoes";
 import { estadoAposRevisao } from "@/lib/servicos/transicoes";
 
 const PAINEL = "/painel/servicos";
@@ -32,6 +32,9 @@ export async function salvarPerfilProfissional(_estado: EstadoFormulario, dados:
     site: texto(dados, "site"), publicado: dados.get("publicado") === "sim",
   });
   if (!resultado.success) return { erros: errosPorCampo(resultado.error), valores };
+  if (resultado.data.publicado && !usuario.emailConfirmado) {
+    return { erro: "Confirme seu e-mail antes de publicar o perfil.", valores };
+  }
   const { municipio, ...perfil } = resultado.data;
   await db.$transaction(async (tx) => {
     const anterior = await tx.perfilProfissional.findUnique({ where: { usuarioId: usuario.id } });
@@ -67,6 +70,7 @@ export async function salvarPerfilProfissional(_estado: EstadoFormulario, dados:
 export async function salvarServico(_estado: EstadoFormulario, dados: FormData): Promise<EstadoFormulario> {
   const usuario = await exigirUsuario(PAINEL);
   const valores = valoresDoFormulario(dados);
+  if (!usuario.emailConfirmado) return { erro: "Confirme seu e-mail antes de anunciar serviços.", valores };
   const id = texto(dados, "id");
   if (id && !idServicoValido(id)) return { erro: "Anúncio inválido.", valores };
   const validado = esquemaServico.safeParse({
@@ -90,7 +94,7 @@ export async function salvarServico(_estado: EstadoFormulario, dados: FormData):
         return { erro: "Não é permitido transferir um anúncio entre prestadores." };
       }
       await tx.servico.update({
-        where: { id },
+        where: { id, ...filtroDePropriedadeServico(usuario.id) },
         data: {
           ...conteudo, cidade: destino.cidade, uf: destino.uf,
           busca: buscaServico(conteudo),
@@ -121,6 +125,7 @@ export async function salvarServico(_estado: EstadoFormulario, dados: FormData):
 
 export async function alternarServico(dados: FormData): Promise<void> {
   const usuario = await exigirUsuario(PAINEL);
+  if (!usuario.emailConfirmado) redirect(PAINEL);
   const id = texto(dados, "id");
   const acao = texto(dados, "oculto");
   if (!idServicoValido(id) || !["sim", "nao"].includes(acao)) redirect(PAINEL);
@@ -130,10 +135,7 @@ export async function alternarServico(dados: FormData): Promise<void> {
     const { count } = await tx.servico.updateMany({
       where: {
         id,
-        OR: [
-          { perfilUsuarioId: usuario.id },
-          { empresa: { is: { membros: { some: { usuarioId: usuario.id } } } } },
-        ],
+        ...filtroDePropriedadeServico(usuario.id),
       },
       data: { oculto },
     });

@@ -21,11 +21,11 @@ export async function identificarPrestador(
   const membro = await tx.empresaMembro.findUnique({
     where: { empresaId_usuarioId: { empresaId, usuarioId } },
     select: {
-      empresaId: true,
+      empresaId: true, papel: true,
       empresa: { select: { status: true, moderacao: true, oculta: true, cidade: true, uf: true } },
     },
   });
-  if (!membro || membro.empresa.status !== "verificada" || membro.empresa.moderacao !== "aprovada" || membro.empresa.oculta) {
+  if (!membro || membro.papel !== "dono" || membro.empresa.status !== "verificada" || membro.empresa.moderacao !== "aprovada" || membro.empresa.oculta) {
     return null;
   }
   return {
@@ -36,15 +36,22 @@ export async function identificarPrestador(
   };
 }
 
+/** Predicado compartilhado para conferir titularidade nas operações de escrita. */
+export function filtroDePropriedadeServico(usuarioId: string): Prisma.ServicoWhereInput {
+  return {
+    OR: [
+      { perfilUsuarioId: usuarioId },
+      { empresa: { is: { membros: { some: { usuarioId, papel: "dono" } } } } },
+    ],
+  };
+}
+
 /** O acesso ao anúncio nunca é inferido apenas da interface. */
 export async function podeGerirServico(tx: Prisma.TransactionClient, usuarioId: string, servicoId: string) {
   const servico = await tx.servico.findFirst({
     where: {
       id: servicoId,
-      OR: [
-        { perfilUsuarioId: usuarioId },
-        { empresa: { is: { membros: { some: { usuarioId } } } } },
-      ],
+      ...filtroDePropriedadeServico(usuarioId),
     },
     select: { id: true, perfilUsuarioId: true, empresaId: true },
   });

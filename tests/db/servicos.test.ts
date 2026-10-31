@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { afterAll, afterEach, describe, expect, it } from "vitest";
 import { db } from "@/lib/db";
 import { filtroServicosPublicos } from "@/lib/servicos/consultas";
-import { identificarPrestador, podeGerirServico } from "@/lib/servicos/permissoes";
+import { filtroDePropriedadeServico, identificarPrestador, podeGerirServico } from "@/lib/servicos/permissoes";
 
 const usuariosCriados: string[] = [];
 const empresasCriadas: string[] = [];
@@ -118,6 +118,22 @@ describe("integridade e visibilidade dos serviços", () => {
     await expect(db.servico.update({
       where: { id: anuncio.id }, data: { remoto: false, presencial: false },
     })).rejects.toThrow();
+  });
+
+  it("protege a atualização com a mesma condição de titularidade utilizada na consulta", async () => {
+    const { dono, anuncio } = await perfilEAnuncio();
+    const pessoaSemPermissao = await usuario("Outra pessoa");
+    const indevido = await db.servico.updateMany({
+      where: { id: anuncio.id, ...filtroDePropriedadeServico(pessoaSemPermissao.id) },
+      data: { oculto: true },
+    });
+    expect(indevido.count).toBe(0);
+    expect((await db.servico.findUniqueOrThrow({ where: { id: anuncio.id } })).oculto).toBe(false);
+    const permitido = await db.servico.updateMany({
+      where: { id: anuncio.id, ...filtroDePropriedadeServico(dono.id) },
+      data: { oculto: true },
+    });
+    expect(permitido.count).toBe(1);
   });
 
   it("identifica quem pode editar; rejeita IDs de terceiros e membros inexistentes", async () => {

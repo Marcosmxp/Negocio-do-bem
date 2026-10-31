@@ -8,6 +8,7 @@ import { Suspense } from "react";
 import { AlternarTema } from "@/components/AlternarTema";
 import { Logo } from "@/components/Logo";
 import { MenuUsuario } from "@/components/MenuUsuario";
+import { ProtecaoDoMenu } from "@/components/ProtecaoDoMenu";
 import { REPOSITORIO } from "@/lib/dominio";
 import { CORES_DA_MARCA } from "@/lib/marca";
 import { DESCRICAO_DO_SITE, ENDERECO_DO_SITE, NOME_DO_SITE, TITULO_DO_SITE } from "@/lib/seo";
@@ -73,12 +74,14 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
               <Link href="/sobre" className="hidden rounded-full px-3 py-2 text-suave transition hover:text-tinta sm:block">
                 Como funciona
               </Link>
-              <Link href="/indicar" className="rounded-full px-2 py-2 text-suave transition hover:text-tinta sm:px-3">
-                Indicar
+              <Link href="/participar" className="rounded-full px-2 py-2 text-suave transition hover:text-tinta sm:px-3">
+                Cadastrar
               </Link>
               <AlternarTema />
               <Suspense fallback={<div className="h-9 w-20 rounded-full bg-linha/60" />}>
-                <MenuUsuario />
+                <ProtecaoDoMenu>
+                  <MenuUsuario />
+                </ProtecaoDoMenu>
               </Suspense>
             </nav>
           </div>
@@ -87,7 +90,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <main className="flex-1">{children}</main>
 
         <footer className="mt-24 border-t border-linha">
-          <div className="mx-auto grid max-w-6xl gap-8 px-4 py-12 text-sm text-suave sm:grid-cols-[2fr_1fr_1fr] sm:px-6">
+          <div className="mx-auto grid grid-cols-1 max-w-6xl gap-8 px-4 py-12 text-sm text-suave sm:grid-cols-[2fr_1fr_1fr] sm:px-6">
             <div className="space-y-3">
               <Logo className="h-12" />
               <p className="max-w-sm leading-relaxed">
@@ -101,9 +104,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             <div className="space-y-2">
               <p className="font-semibold text-tinta">Comunidade</p>
               <Link href="/explorar" className="block hover:text-tinta">Explorar negócios</Link>
-              <Link href="/cidades" className="block hover:text-tinta">Negócios por cidade</Link>
               <Link href="/servicos" className="block hover:text-tinta">Encontrar serviços</Link>
-              <Link href="/indicar" className="block hover:text-tinta">Indicar um negócio</Link>
+              <Link href="/cidades" className="block hover:text-tinta">Negócios por cidade</Link>
+              <Link href="/participar" className="block hover:text-tinta">Cadastrar um negócio</Link>
             </div>
             <div className="space-y-2">
               <p className="font-semibold text-tinta">Para negócios</p>
