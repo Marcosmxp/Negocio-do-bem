@@ -76,6 +76,20 @@ describe("pedidos antigos por código de DM", () => {
 });
 
 describe("Entrar com Instagram", () => {
+  it("confirma pelo Instagram o perfil já assumido pelo mesmo dono", async () => {
+    const dono = await criarUsuario();
+    const empresa = await criarEmpresa("perfil.assumido");
+    await db.empresaMembro.create({ data: { empresaId: empresa.id, usuarioId: dono.id } });
+
+    expect(await processarLoginInstagram({
+      empresaId: empresa.id, usuarioId: dono.id,
+      conta: { userId: "id-perfil-assumido", username: empresa.instagramUsername },
+    })).toEqual({ tipo: "verificada" });
+    expect(await db.reivindicacao.findFirst({ where: { empresaId: empresa.id, usuarioId: dono.id } }))
+      .toMatchObject({ metodo: "instagram_login", status: "aprovada" });
+    expect(await db.empresa.findUniqueOrThrow({ where: { id: empresa.id } })).toMatchObject({ oficial: true });
+  });
+
   it("aprova na hora quando a conta é a do negócio", async () => {
     const dono = await criarUsuario();
     const empresa = await criarEmpresa("casa.do_bem");
