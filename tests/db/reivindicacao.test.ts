@@ -6,8 +6,6 @@ import {
   aprovar,
   aprovarPendentesSemDono,
   ErroReivindicacao,
-  iniciarPorCodigoDm,
-  processarDm,
   processarLoginInstagram,
   recusar,
   solicitarPorDocumento,
@@ -45,119 +43,37 @@ async function donos(empresaId: string) {
   return membros.map((m) => m.usuarioId).sort();
 }
 
-const responde = (username: string | null) => async () => username;
-
 beforeEach(limparBanco);
 afterAll(async () => {
   await limparBanco();
   await db.$disconnect();
 });
 
-describe("código por DM", () => {
-  it("gera um código e reaproveita enquanto ele vale", async () => {
-    const dono = await criarUsuario();
-    const empresa = await criarEmpresa("padaria.flor");
-
-    const primeira = await iniciarPorCodigoDm(empresa.id, dono.id);
-    const segunda = await iniciarPorCodigoDm(empresa.id, dono.id);
-
-    expect(primeira.codigo).toMatch(/^BEM-/);
-    expect(segunda.id).toBe(primeira.id);
-    expect(primeira.expiraEm.getTime()).toBeGreaterThan(Date.now() + 47 * 60 * 60 * 1000);
-  });
-
-  it("gera um código novo quando o anterior expirou", async () => {
-    const dono = await criarUsuario();
-    const empresa = await criarEmpresa("padaria.flor");
-    const velha = await iniciarPorCodigoDm(empresa.id, dono.id);
-    await db.reivindicacao.update({ where: { id: velha.id }, data: { expiraEm: new Date(Date.now() - 1000) } });
-
-    const nova = await iniciarPorCodigoDm(empresa.id, dono.id);
-
-    expect(nova.id).not.toBe(velha.id);
-    expect((await db.reivindicacao.findUnique({ where: { id: velha.id } }))?.status).toBe("expirada");
-  });
-
-  it("aprova sozinho quando a DM vem do @ do negócio", async () => {
-    const dono = await criarUsuario();
-    const empresa = await criarEmpresa("padaria.flor");
-    const { codigo } = await iniciarPorCodigoDm(empresa.id, dono.id);
-
-    const resultado = await processarDm({
-      remetenteId: "igsid-1",
-      texto: `oi, segue o código ${codigo}`,
-      buscarUsername: responde("padaria.flor"),
-    });
-
-    expect(resultado).toBe("aprovada");
-    expect(await donos(empresa.id)).toEqual([dono.id]);
-    const atualizada = await db.empresa.findUniqueOrThrow({ where: { id: empresa.id } });
-    expect(atualizada.status).toBe("verificada");
-    expect(atualizada.instagramIgsid).toBe("igsid-1");
-    expect(await db.registroAuditoria.count({ where: { alvoId: empresa.id, usuarioId: null } })).toBe(1);
-  });
-
-  it("não aprova quando a DM vem de outro @", async () => {
-    const golpista = await criarUsuario();
-    const empresa = await criarEmpresa("padaria.flor");
-    const { codigo, id } = await iniciarPorCodigoDm(empresa.id, golpista.id);
-
-    const resultado = await processarDm({
-      remetenteId: "igsid-2",
-      texto: codigo!,
-      buscarUsername: responde("outra.conta"),
-    });
-
-    expect(resultado).toBe("em_analise");
-    expect(await donos(empresa.id)).toEqual([]);
-    const reivindicacao = await db.reivindicacao.findUniqueOrThrow({ where: { id } });
-    expect(reivindicacao.status).toBe("pendente");
-    expect(reivindicacao.notas).toContain("@outra.conta");
-  });
-
-  it("deixa para a moderação quando não dá para descobrir o @", async () => {
-    const dono = await criarUsuario();
-    const empresa = await criarEmpresa("padaria.flor");
-    const { codigo, id } = await iniciarPorCodigoDm(empresa.id, dono.id);
-
-    expect(await processarDm({ remetenteId: "x", texto: codigo!, buscarUsername: responde(null) })).toBe("em_analise");
-    expect((await db.reivindicacao.findUniqueOrThrow({ where: { id } })).notas).toContain("Confira no Instagram");
-  });
-
-  it("ignora mensagens sem código ou com código desconhecido", async () => {
-    expect(await processarDm({ remetenteId: "x", texto: "olá!", buscarUsername: responde("a") })).toBe("ignorada");
-    expect(await processarDm({ remetenteId: "x", texto: "BEM-AAAAAA", buscarUsername: responde("a") })).toBe("ignorada");
-  });
-
-  it("não aceita código expirado", async () => {
-    const dono = await criarUsuario();
-    const empresa = await criarEmpresa("padaria.flor");
-    const { codigo, id } = await iniciarPorCodigoDm(empresa.id, dono.id);
-    await db.reivindicacao.update({ where: { id }, data: { expiraEm: new Date(Date.now() - 1000) } });
-
-    expect(await processarDm({ remetenteId: "x", texto: codigo!, buscarUsername: responde("padaria.flor") })).toBe(
-      "em_analise",
-    );
-    expect(await donos(empresa.id)).toEqual([]);
-  });
-
-  it("quando já existe dono, a moderação decide e pode transferir", async () => {
+describe("pedidos antigos por código de DM", () => {
+  it("a moderação ainda aprova, transfere e leva o IGSID guardado", async () => {
     const antigo = await criarUsuario("Antigo");
     const novo = await criarUsuario("Novo");
-    const empresa = await criarEmpresa("padaria.flor");
-    await db.empresaMembro.create({ data: { empresaId: empresa.id, usuarioId: antigo.id } });
     const moderador = await criarUsuario("Moderação");
-    const { codigo, id } = await iniciarPorCodigoDm(empresa.id, novo.id);
+    const empresa = await criarEmpresa("padaria.flor");
+    const outra = await criarEmpresa("nome.antigo", { instagramIgsid: "igsid-novo" });
+    await db.empresaMembro.create({ data: { empresaId: empresa.id, usuarioId: antigo.id } });
+    // O caminho não cria mais pedidos: este ficou no banco de antes.
+    const pedido = await db.reivindicacao.create({
+      data: {
+        empresaId: empresa.id,
+        usuarioId: novo.id,
+        metodo: "codigo_dm",
+        codigo: "BEM-7K3F9Q",
+        instagramIgsid: "igsid-novo",
+        expiraEm: new Date(Date.now() - 1000),
+      },
+    });
 
-    expect(
-      await processarDm({ remetenteId: "igsid-novo", texto: codigo!, buscarUsername: responde("padaria.flor") }),
-    ).toBe("em_analise");
-    expect(await donos(empresa.id)).toEqual([antigo.id]);
-
-    await aprovar({ reivindicacaoId: id, revisorId: moderador.id, modo: "transferir" });
+    await aprovar({ reivindicacaoId: pedido.id, revisorId: moderador.id, modo: "transferir" });
 
     expect(await donos(empresa.id)).toEqual([novo.id]);
     expect((await db.empresa.findUniqueOrThrow({ where: { id: empresa.id } })).instagramIgsid).toBe("igsid-novo");
+    expect((await db.empresa.findUniqueOrThrow({ where: { id: outra.id } })).instagramIgsid).toBeNull();
   });
 });
 
@@ -237,26 +153,14 @@ describe("renovação durante aprovação com troca do ID do Instagram", () => {
     return { promessa, liberar };
   }
 
-  it.each([
-    ["instagram_login", "antes"],
-    ["instagram_login", "depois"],
-    ["codigo_dm", "depois"],
-  ] as const)("renova %s %s da troca do ID sem deadlock na mesma empresa", async (metodo, momento) => {
+  it.each(["antes", "depois"] as const)("renova o login do Instagram %s da troca do ID sem deadlock", async (momento) => {
     const pessoa = await criarUsuario();
     const moderador = await criarUsuario("Moderação");
     const empresa = await criarEmpresa("renovacao", { instagramUserId: "id-anterior" });
     const antigo = await db.reivindicacao.create({
       data: {
-        empresaId: empresa.id, usuarioId: pessoa.id, metodo,
-        instagramUserId: metodo === "instagram_login" ? "id-aprovado" : null,
-        expiraEm: new Date(Date.now() - 60_000),
-      },
-    });
-    // Na DM, a aprovação de outro pedido cancela o código vencido da mesma pessoa.
-    const paraAprovar = metodo === "instagram_login" ? antigo : await db.reivindicacao.create({
-      data: {
         empresaId: empresa.id, usuarioId: pessoa.id, metodo: "instagram_login",
-        instagramUserId: "id-aprovado", expiraEm: new Date(Date.now() + 60_000),
+        instagramUserId: "id-aprovado", expiraEm: new Date(Date.now() - 60_000),
       },
     });
     const pedidoLido = sinal();
@@ -281,7 +185,7 @@ describe("renovação durante aprovação com troca do ID do Instagram", () => {
         },
         async updateMany({ args, query }) {
           const resultado = await query(args);
-          if (args.where?.metodo === metodo) alterouPedido = resultado.count > 0;
+          if (args.where?.metodo === "instagram_login") alterouPedido = resultado.count > 0;
           return resultado;
         },
       },
@@ -310,12 +214,10 @@ describe("renovação durante aprovação com troca do ID do Instagram", () => {
 
     const resultados: Promise<PromiseSettledResult<unknown>[]>[] = [];
     try {
-      resultados.push(Promise.allSettled([aprovar({ reivindicacaoId: paraAprovar.id, revisorId: moderador.id })]));
+      resultados.push(Promise.allSettled([aprovar({ reivindicacaoId: antigo.id, revisorId: moderador.id })]));
       await pedidoLido.promessa;
-      resultados.push(Promise.allSettled([metodo === "instagram_login"
-        ? processarLoginInstagram({ empresaId: empresa.id, usuarioId: pessoa.id,
-          conta: { userId: "id-renovado", username: empresa.instagramUsername } })
-        : iniciarPorCodigoDm(empresa.id, pessoa.id)]));
+      resultados.push(Promise.allSettled([processarLoginInstagram({ empresaId: empresa.id, usuarioId: pessoa.id,
+        conta: { userId: "id-renovado", username: empresa.instagramUsername } })]));
       await renovacaoPronta.promessa;
       if (momento === "depois") {
         continuarAprovacao.liberar();
@@ -329,21 +231,20 @@ describe("renovação durante aprovação com troca do ID do Instagram", () => {
           SELECT pg_blocking_pids(${pidRenovacao}::int) AS bloqueadores`;
         return bloqueadores;
       }).toContain(pidAprovacao);
-      console.info(`${metodo}: renovação bloqueada pela aprovação, pedido antigo alterado: ${alterouPedido}`);
+      console.info(`Renovação bloqueada pela aprovação, pedido antigo alterado: ${alterouPedido}`);
       continuarAprovacao.liberar();
       concluirAprovacao.liberar();
       const concluidos = (await Promise.all(resultados)).flat();
       expect(concluidos).toEqual([
         { status: "fulfilled", value: undefined },
-        { status: "fulfilled", value: metodo === "instagram_login" ? { tipo: "em_analise" } : expect.objectContaining({ metodo: "codigo_dm" }) },
+        { status: "fulfilled", value: { tipo: "em_analise" } },
       ]);
       expect(alterouPedido).toBe(false);
       expect(await donos(empresa.id)).toEqual([pessoa.id]);
       expect((await db.empresa.findUniqueOrThrow({ where: { id: empresa.id } })).instagramUserId).toBe("id-aprovado");
-      expect((await db.reivindicacao.findUniqueOrThrow({ where: { id: antigo.id } })).status)
-        .toBe(metodo === "instagram_login" ? "aprovada" : "cancelada");
-      expect(await db.reivindicacao.count({ where: { empresaId: empresa.id, metodo, status: "pendente" } })).toBe(1);
-      expect(await db.reivindicacao.count({ where: { usuarioId: pessoa.id } })).toBe(metodo === "instagram_login" ? 2 : 3);
+      expect((await db.reivindicacao.findUniqueOrThrow({ where: { id: antigo.id } })).status).toBe("aprovada");
+      expect(await db.reivindicacao.count({ where: { empresaId: empresa.id, metodo: "instagram_login", status: "pendente" } })).toBe(1);
+      expect(await db.reivindicacao.count({ where: { usuarioId: pessoa.id } })).toBe(2);
       expect(await db.registroAuditoria.count({ where: { alvoId: empresa.id, acao: "reivindicacao.aprovada" } })).toBe(1);
     } finally {
       continuarAprovacao.liberar();
@@ -521,7 +422,9 @@ describe("documento e moderação", () => {
       const empresa = await criarEmpresa("loja.dois.pedidos");
       await db.empresaMembro.create({ data: { empresaId: empresa.id, usuarioId: dono.id } });
       const porDocumento = await solicitarPorDocumento({ empresaId: empresa.id, usuarioId: pessoa.id, cnpj: null, site: null, relacao: "Dono", contato: "x", mensagem: null });
-      const porDm = await iniciarPorCodigoDm(empresa.id, pessoa.id);
+      const porDm = await db.reivindicacao.create({
+        data: { empresaId: empresa.id, usuarioId: pessoa.id, metodo: "codigo_dm", expiraEm: new Date(Date.now() - 1000) },
+      });
       const moderadoras = [await criarUsuario("Moderação 1"), await criarUsuario("Moderação 2")];
 
       // Aquece o pool para saber quais conexões do Postgres são as deste teste.
@@ -597,10 +500,12 @@ describe("documento e moderação", () => {
     const pessoa = await criarUsuario();
     for (let i = 0; i < 10; i++) {
       const empresa = await criarEmpresa(`loja${i}`);
-      await iniciarPorCodigoDm(empresa.id, pessoa.id);
+      await solicitarPorDocumento({ empresaId: empresa.id, usuarioId: pessoa.id, ...dadosDoNegocio });
     }
     const mais = await criarEmpresa("loja.extra");
-    await expect(iniciarPorCodigoDm(mais.id, pessoa.id)).rejects.toThrow(/muitas solicitações/);
+    await expect(
+      solicitarPorDocumento({ empresaId: mais.id, usuarioId: pessoa.id, ...dadosDoNegocio }),
+    ).rejects.toThrow(/muitas solicitações/);
   });
 
   describe("limite diário com pedidos simultâneos", () => {
@@ -668,17 +573,6 @@ describe("documento e moderação", () => {
       expect(await db.reivindicacao.count({ where: { usuarioId: pessoa.id } })).toBe(10);
     });
 
-    it("por código de DM: 25 pedidos ao mesmo tempo criam só 10", async () => {
-      const pessoa = await criarUsuario();
-      const empresas = [];
-      for (let i = 0; i < 25; i++) empresas.push(await criarEmpresa(`dm${i}`));
-
-      const resultados = await Promise.allSettled(empresas.map((e) => iniciarPorCodigoDm(e.id, pessoa.id)));
-
-      conferir(resultados, 10);
-      expect(await db.reivindicacao.count({ where: { usuarioId: pessoa.id } })).toBe(10);
-    });
-
     it("por login do Instagram: 25 pedidos ao mesmo tempo criam só 10", async () => {
       const pessoa = await criarUsuario();
       const empresas = [];
@@ -698,20 +592,15 @@ describe("documento e moderação", () => {
       expect(await db.reivindicacao.count({ where: { usuarioId: pessoa.id } })).toBe(10);
     });
 
-    it("os três caminhos juntos dividem a mesma cota", async () => {
+    it("os dois caminhos juntos dividem a mesma cota", async () => {
       const pessoa = await criarUsuario();
       await criarPedidosRecentes(pessoa.id, 7, "antigo");
       const comDono = await criarEmpresasComDono(3, "doc");
-      const paraDm = [];
       const paraLogin = [];
-      for (let i = 0; i < 3; i++) {
-        paraDm.push(await criarEmpresa(`dm${i}`));
-        paraLogin.push(await criarEmpresa(`ig${i}`));
-      }
+      for (let i = 0; i < 3; i++) paraLogin.push(await criarEmpresa(`ig${i}`));
 
       const resultados = await Promise.allSettled([
         ...comDono.map((e) => solicitarPorDocumento({ empresaId: e.id, usuarioId: pessoa.id, ...DADOS })),
-        ...paraDm.map((e) => iniciarPorCodigoDm(e.id, pessoa.id)),
         ...paraLogin.map((e, i) =>
           processarLoginInstagram({
             empresaId: e.id,
@@ -768,6 +657,8 @@ describe("documento e moderação", () => {
     const dono = await criarUsuario();
     const empresa = await criarEmpresa("loja.y");
     await db.empresaMembro.create({ data: { empresaId: empresa.id, usuarioId: dono.id } });
-    await expect(iniciarPorCodigoDm(empresa.id, dono.id)).rejects.toThrow(/já é dono/);
+    await expect(solicitarPorDocumento({ empresaId: empresa.id, usuarioId: dono.id, ...dadosDoNegocio })).rejects.toThrow(
+      /já é dono/,
+    );
   });
 });

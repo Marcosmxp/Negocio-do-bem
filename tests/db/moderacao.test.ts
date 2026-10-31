@@ -369,6 +369,22 @@ describe("decisões simultâneas da moderação", () => {
     expect(await registrosNovos(desde)).toHaveLength(1);
   });
 
+  it("desfaz decisões condicionais quando a auditoria falha", async () => {
+    const denunciado = await db.depoimento.findFirstOrThrow({ where: { denunciado: true, status: "publicado" } });
+    await db.$executeRawUnsafe('ALTER TABLE "RegistroAuditoria" ADD CONSTRAINT "falha_auditoria_condicional_teste" CHECK (false) NOT VALID');
+    try {
+      await expect(moderarNegocio({ empresaId: padaria.id, de: "aprovada", decisao: "rejeitada", moderadorId: moderadora.id })).rejects.toThrow();
+      await expect(decidirDenunciaDoDepoimento({ depoimentoId: denunciado.id, remover: true, moderadorId: moderadora.id })).rejects.toThrow();
+      expect((await db.empresa.findUniqueOrThrow({ where: { id: padaria.id } })).moderacao).toBe("aprovada");
+      expect(await db.depoimento.findUniqueOrThrow({ where: { id: denunciado.id } })).toMatchObject({
+        denunciado: true,
+        status: "publicado",
+      });
+    } finally {
+      await db.$executeRawUnsafe('ALTER TABLE "RegistroAuditoria" DROP CONSTRAINT "falha_auditoria_condicional_teste"');
+    }
+  });
+
   it("não aplica a decisão quando o negócio já mudou de situação", async () => {
     expect(await moderarNegocio({ empresaId: padaria.id, de: "pendente", decisao: "rejeitada", moderadorId: moderadora.id })).toBe(false);
     expect((await db.empresa.findUniqueOrThrow({ where: { id: padaria.id } })).moderacao).toBe("aprovada");
