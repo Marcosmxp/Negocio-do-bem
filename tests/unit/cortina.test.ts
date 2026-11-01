@@ -55,6 +55,19 @@ describe("destinoDaCortina", () => {
   });
 });
 
+describe("isolamento de interações da cortina", () => {
+  it("respeita opt-out nos ancestrais e não intercepta texto editável", () => {
+    const componente = readFileSync(
+      new URL("../../src/components/cortina/CortinaDePagina.tsx", import.meta.url),
+      "utf8",
+    );
+    expect(componente).toContain('alvo.closest(\'[data-sem-cortina], [inert], [aria-disabled="true"]\')');
+    expect(componente).toContain("alvo.isContentEditable");
+    expect(componente).toContain('evento.target.closest("[contenteditable]")');
+    expect(componente).toContain("evento.defaultPrevented");
+  });
+});
+
 describe("abertura pulada", () => {
   it("reinicia a saída do contêiner sem aproveitar o tempo da abertura normal", () => {
     const css = readFileSync(new URL("../../src/components/cortina/cortina.css", import.meta.url), "utf8");
