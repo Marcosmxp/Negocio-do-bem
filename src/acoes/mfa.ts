@@ -1,7 +1,6 @@
 "use server";
 
 import { headers } from "next/headers";
-import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { verificarSenha } from "@/lib/auth/senha";
 import { caminhoSeguro, encerrarSessao, sessaoAtual } from "@/lib/auth/sessao";
