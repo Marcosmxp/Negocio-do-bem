@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { afterAll, afterEach, describe, expect, it } from "vitest";
 import { db } from "@/lib/db";
 import { filtroServicosPublicos } from "@/lib/servicos/consultas";
-import { filtroDePropriedadeServico, identificarPrestador, podeGerirServico } from "@/lib/servicos/permissoes";
+import { filtroDePropriedadeServico, identificarPrestador, podeGerirServico, sincronizarMunicipioServicos } from "@/lib/servicos/permissoes";
 
 const usuariosCriados: string[] = [];
 const empresasCriadas: string[] = [];
@@ -52,6 +52,51 @@ describe("integridade e visibilidade dos serviços", () => {
     expect((await db.servico.findMany({ where: filtro })).map((s) => s.id)).toEqual([anuncio.id]);
     await db.perfilProfissional.update({ where: { usuarioId: perfil.usuarioId }, data: { publicado: false } });
     expect(await db.servico.count({ where: filtro })).toBe(0);
+  });
+
+  it("sincroniza a cidade de todos os anúncios sem reverter recusas ou suspensões", async () => {
+    const { dono, anuncio } = await perfilEAnuncio();
+    const estados = [
+      { status: "pendente", motivoRecusa: null, motivoSuspensao: null },
+      { status: "rejeitado", motivoRecusa: "Revisão necessária.", motivoSuspensao: null },
+      { status: "suspenso", motivoRecusa: null, motivoSuspensao: "Suspensão por moderação." },
+    ];
+    const criados = await Promise.all(estados.map((estado, i) => db.servico.create({
+      data: {
+        perfilUsuarioId: dono.id,
+        titulo: `Serviço de teste ${i + 1}`,
+        descricao: "Descrição do serviço criada para verificar atualização de localização.",
+        categoria: "Tecnologia",
+        cidade: "Recife",
+        uf: "PE",
+        remoto: true,
+        busca: "servico teste",
+        ...estado,
+      },
+    })));
+
+    await db.$transaction(async (tx) => {
+      await tx.perfilProfissional.update({
+        where: { usuarioId: dono.id },
+        data: { cidade: "Olinda", uf: "PE" },
+      });
+      await sincronizarMunicipioServicos(tx, dono.id, { nome: "Olinda", uf: "PE" });
+      await tx.servico.updateMany({
+        where: { perfilUsuarioId: dono.id, status: "publicado" },
+        data: { status: "pendente", motivoRecusa: null, moderadoEm: null },
+      });
+    });
+
+    const atualizados = await db.servico.findMany({
+      where: { id: { in: [anuncio.id, ...criados.map((item) => item.id)] } },
+    });
+    expect(atualizados).toHaveLength(4);
+    expect(atualizados.every((item) => item.cidade === "Olinda" && item.uf === "PE")).toBe(true);
+    const porId = new Map(atualizados.map((item) => [item.id, item]));
+    expect(porId.get(anuncio.id)?.status).toBe("pendente");
+    expect(criados.map((item) => porId.get(item.id)?.status)).toEqual(["pendente", "rejeitado", "suspenso"]);
+    expect(porId.get(criados[1]!.id)?.motivoRecusa).toBe("Revisão necessária.");
+    expect(porId.get(criados[2]!.id)?.motivoSuspensao).toBe("Suspensão por moderação.");
   });
 
   it("respeita a área de atendimento sem confundir a origem com a cidade pesquisada", async () => {
