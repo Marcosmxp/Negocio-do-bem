@@ -26,9 +26,30 @@ async function contextoModerador() {
   return sessao;
 }
 
-async function limitarTentativa(email: string): Promise<{ permitido: boolean; ip: string | null }> {
+/**
+ * Limite por conta, partilhado entre sessões: um atacante não pode reiniciar
+ * as tentativas do MFA voltando ao login com uma senha já comprometida.
+ */
+async function reservarTentativaMfa(usuarioId: string): Promise<boolean> {
+  const agora = new Date();
+  const inicio = new Date(agora.getTime() - 15 * 60_000);
+  const [linha] = await db.$queryRaw<{ contagem: number }[]>`
+    INSERT INTO "MfaLimite" ("usuarioId", "contagem", "janelaIniciadaEm")
+    VALUES (${usuarioId}, 1, ${agora})
+    ON CONFLICT ("usuarioId") DO UPDATE SET
+      "contagem" = CASE WHEN "MfaLimite"."janelaIniciadaEm" >= ${inicio}
+        THEN "MfaLimite"."contagem" + 1 ELSE 1 END,
+      "janelaIniciadaEm" = CASE WHEN "MfaLimite"."janelaIniciadaEm" >= ${inicio}
+        THEN "MfaLimite"."janelaIniciadaEm" ELSE EXCLUDED."janelaIniciadaEm" END
+    RETURNING "contagem"
+  `;
+  return linha!.contagem <= 10;
+}
+
+async function limitarTentativa(email: string, usuarioId: string): Promise<{ permitido: boolean; ip: string | null }> {
   const ip = ipDoCabecalho(await headers());
-  return { permitido: await reservarTentativaDoEmail(email, ip), ip };
+  const permitidoMfa = await reservarTentativaMfa(usuarioId);
+  return { permitido: permitidoMfa && await reservarTentativaDoEmail(email, ip), ip };
 }
 
 /** O primeiro cadastro do segundo fator exige uma nova prova da senha atual. */
@@ -38,7 +59,7 @@ export async function iniciarConfiguracaoMfa(_estado: EstadoMfa, dados: FormData
   if (!sessao.usuario.senhaHash) {
     return { erro: "Crie primeiro uma senha pelo link de recuperação no seu painel; depois volte para configurar o MFA." };
   }
-  const limite = await limitarTentativa(sessao.usuario.email);
+  const limite = await limitarTentativa(sessao.usuario.email, sessao.usuarioId);
   if (!limite.permitido) return { erro: "Muitas tentativas. Tente novamente em 15 minutos." };
   const senha = dados.get("senha");
   if (typeof senha !== "string" || !(await verificarSenha(senha, sessao.usuario.senhaHash))) {
@@ -64,7 +85,7 @@ export async function confirmarConfiguracaoMfa(_estado: EstadoMfa, dados: FormDa
     return { erro: "Inicie a configuração novamente." };
   }
   const codigo = dados.get("codigo");
-  const limite = await limitarTentativa(sessao.usuario.email);
+  const limite = await limitarTentativa(sessao.usuario.email, sessao.usuarioId);
   if (!limite.permitido) return { erro: "Muitas tentativas. Tente novamente em 15 minutos." };
   const periodo = validarCodigoMfa(
     descriptografarSegredoMfa(pendente.mfaSegredoPendente),
@@ -94,6 +115,7 @@ export async function confirmarConfiguracaoMfa(_estado: EstadoMfa, dados: FormDa
     return true;
   });
   if (!configurado) return { erro: "O MFA já foi configurado noutra sessão. Atualize a página." };
+  await db.mfaLimite.deleteMany({ where: { usuarioId: sessao.usuarioId } });
   await zerarTentativasDoEmail(sessao.usuario.email, limite.ip);
   return { codigos };
 }
@@ -105,7 +127,7 @@ export async function validarSegundoFator(_estado: EstadoMfa, dados: FormData): 
     return { erro: "Configure o segundo fator antes de continuar." };
   }
   const codigo = typeof dados.get("codigo") === "string" ? String(dados.get("codigo")).trim() : "";
-  const limite = await limitarTentativa(sessao.usuario.email);
+  const limite = await limitarTentativa(sessao.usuario.email, sessao.usuarioId);
   if (!limite.permitido) return { erro: "Muitas tentativas. Tente novamente em 15 minutos." };
 
   const { count } = await db.sessao.updateMany({
@@ -151,6 +173,7 @@ export async function validarSegundoFator(_estado: EstadoMfa, dados: FormData): 
     return true;
   });
   if (!valido) return { erro: "Código inválido, já usado ou expirado." };
+  await db.mfaLimite.deleteMany({ where: { usuarioId: sessao.usuarioId } });
   await zerarTentativasDoEmail(sessao.usuario.email, limite.ip);
   redirect(caminhoSeguro(dados.get("voltar"), "/moderacao"));
 }
