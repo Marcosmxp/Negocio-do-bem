@@ -28,6 +28,8 @@ describe("rótulos de perfil assumido", () => {
     expect(selo).toContain("O selo não certifica a identidade nem as causas do negócio.");
     expect(selo).not.toContain("moderação conferiu");
     expect(selo).not.toContain("Verificado pelo dono");
+    expect(selo).not.toContain("<svg");
+    expect(selo).toContain("border-linha");
   });
 
   it("mantém o selo de indicação sem afirmar que o perfil já foi assumido", () => {
@@ -43,7 +45,9 @@ describe("rótulos de perfil assumido", () => {
 
     expect(card).toContain("Perfil assumido");
     expect(linha).toContain('aria-label="Perfil assumido"');
-    expect(linha).toContain("<title>Perfil assumido</title>");
+    expect(linha).toContain("Identidade e causas não certificadas.");
+    expect(linha).not.toContain("<svg");
+    expect(card).not.toContain("<svg");
     expect(linha).not.toContain("Verificado pelo dono");
   });
 
