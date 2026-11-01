@@ -57,3 +57,19 @@ export async function podeGerirServico(tx: Prisma.TransactionClient, usuarioId: 
   });
   return servico;
 }
+
+/**
+ * Sincroniza a localização do prestador em TODOS os anúncios, mesmo que estejam
+ * pendentes, rejeitados ou suspensos. A decisão de moderação permanece intacta.
+ * Deve ser chamada na mesma transação que altera o perfil profissional.
+ */
+export async function sincronizarMunicipioServicos(
+  tx: Prisma.TransactionClient,
+  usuarioId: string,
+  municipio: { nome: string; uf: string },
+): Promise<void> {
+  await tx.servico.updateMany({
+    where: { perfilUsuarioId: usuarioId },
+    data: { cidade: municipio.nome, uf: municipio.uf },
+  });
+}
