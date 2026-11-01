@@ -19,3 +19,13 @@ CREATE TABLE "MfaCodigoRecuperacao" (
 CREATE INDEX "MfaCodigoRecuperacao_usuarioId_idx" ON "MfaCodigoRecuperacao"("usuarioId");
 ALTER TABLE "MfaCodigoRecuperacao" ADD CONSTRAINT "MfaCodigoRecuperacao_usuarioId_fkey"
   FOREIGN KEY ("usuarioId") REFERENCES "Usuario"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+CREATE TABLE "MfaLimite" (
+  "usuarioId" TEXT NOT NULL,
+  "contagem" INTEGER NOT NULL,
+  "janelaIniciadaEm" TIMESTAMP(3) NOT NULL,
+  CONSTRAINT "MfaLimite_pkey" PRIMARY KEY ("usuarioId")
+);
+
+ALTER TABLE "MfaLimite" ADD CONSTRAINT "MfaLimite_usuarioId_fkey"
+  FOREIGN KEY ("usuarioId") REFERENCES "Usuario"("id") ON DELETE CASCADE ON UPDATE CASCADE;
