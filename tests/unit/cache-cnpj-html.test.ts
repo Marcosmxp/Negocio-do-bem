@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { observarFila } from "../apoio/cache-cnpj/html.mjs";
+import { observarFila, sanitizarHtml } from "../apoio/cache-cnpj/html.mjs";
 
 const empresa = "Empresa sintética";
 const marcador = "RECEITA_SINTETICA";
@@ -29,6 +29,21 @@ describe("observador HTTP do cache de CNPJ por ficha", () => {
   it("não troca associação por contagem global quando a ficha errada repete o marcador", () => {
     const html = ficha("pedido-1", `${marcador} ${marcador}`) + ficha("pedido-2");
     expect(observar(html, "pedido-2").marcadorRenderizado).toBe(false);
+  });
+
+  it("reconhece o fecho de script com espaços sem aceitar payload RSC como dado", () => {
+    const payload = '<script>self.__next_f.push([1,"<span>RECEITA_SINTETICA</span>"])</script >';
+    expect(sanitizarHtml(payload)).toBe("");
+    expect(observar(ficha("pedido-1") + payload, "pedido-1").marcadorRenderizado).toBe(false);
+  });
+
+  it("não interpreta comentários HTML como marcador renderizado", () => {
+    expect(observar(ficha("pedido-1", "<!--RECEITA_SINTETICA-->"), "pedido-1").marcadorRenderizado).toBe(false);
+  });
+
+  it("mantém o marcador mesmo com atributos contendo sinal de maior", () => {
+    const html = ficha("pedido-1", "", '<span title="3 > 2">RECEITA_SINTETICA</span>');
+    expect(observar(html, "pedido-1").marcadorRenderizado).toBe(true);
   });
 
   it("não aceita o marcador renderizado somente fora das fichas", () => {
