@@ -34,7 +34,7 @@ export function formularioDeEntrada(html, pagina) {
   return { destino, dados };
 }
 export function sanitizarHtml(html) {
-  return html.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, "<!-- script omitido -->")
+  return html.replace(/<script\b[^>]*>[\s\S]*?<\/script\s*>/gi, "")
     .replace(/<input\b[^>]*>/gi, tag => {
       const nome = atributo(tag, "name");
       if (!nome?.startsWith("$ACTION")) return tag;
@@ -65,7 +65,7 @@ function pedidoNoFormulario(formulario, pedido) {
 /** Lê apenas a instrução de conclusão emitida pelo React instalado, sem executar JavaScript. */
 function segmentosConcluidos(html) {
   const pares = new Map();
-  for (const script of html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)) {
+  for (const script of html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi)) {
     const tipo = atributo(script[1], "type");
     if (tipo && !/^(?:text|application)\/javascript$/i.test(tipo)) continue;
     const chamada = script[2].match(/\$RC\("([\w:.-]*B:[0-9a-f]+)","([\w:.-]*S:[0-9a-f]+)"\)\s*;?\s*$/);
@@ -79,8 +79,48 @@ function segmentosConcluidos(html) {
   return pares;
 }
 
+
+/** Remove comentários sem substituições HTML iterativas que possam criar nova marcação. */
+function semComentarios(html) {
+  const trechos = [];
+  let inicio = 0;
+  for (;;) {
+    const abre = html.indexOf("<!--", inicio);
+    if (abre === -1) {
+      trechos.push(html.slice(inicio));
+      return trechos.join("");
+    }
+    trechos.push(html.slice(inicio, abre));
+    const fecha = html.indexOf("-->", abre + 4);
+    exigir(fecha !== -1, "comentario-html-incompleto");
+    inicio = fecha + 3;
+  }
+}
+
+/** Extrai texto de conteúdo renderizado; nunca executa nem injeta HTML. */
+function textoRenderizado(html) {
+  let resultado = "";
+  let emTag = false;
+  let aspas = "";
+  for (let i = 0; i < html.length; i++) {
+    const caractere = html[i];
+    if (!emTag) {
+      if (caractere === "<") emTag = true;
+      else resultado += caractere;
+    } else if (aspas) {
+      if (caractere === aspas) aspas = "";
+    } else if (caractere === '"' || caractere === "'") {
+      aspas = caractere;
+    } else if (caractere === ">") {
+      emTag = false;
+    }
+  }
+  exigir(!emTag, "marcacao-html-incompleta");
+  return decodificar(resultado);
+}
+
 export function observarFila(html, empresa, pedido, marcador) {
-  const renderizado = sanitizarHtml(html).replace(/<!--[\s\S]*?-->/g, "");
+  const renderizado = semComentarios(sanitizarHtml(html));
   const fichas = elementos(renderizado, "article").filter(ficha =>
     elementos(ficha.corpo, "form").some(formulario => pedidoNoFormulario(formulario, pedido)));
   exigir(fichas.length <= 1, "ficha-unica");
@@ -105,9 +145,9 @@ export function observarFila(html, empresa, pedido, marcador) {
     dados += encontrados[0].corpo;
   }
   return {
-    ficha: decodificar(ficha.corpo.replace(/<[^>]*>/g, "")).includes(empresa),
+    ficha: textoRenderizado(ficha.corpo).includes(empresa),
     controles,
     marcadorRenderizado: elementos(dados, "span").some(trecho =>
-      decodificar(trecho.corpo.replace(/<[^>]*>/g, "")).includes(marcador)),
+      textoRenderizado(trecho.corpo).includes(marcador)),
   };
 }
