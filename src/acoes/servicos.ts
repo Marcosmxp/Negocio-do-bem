@@ -10,7 +10,7 @@ import {
   buscaServico, esquemaModeracaoServico, esquemaPerfilProfissional,
   esquemaServico, idServicoValido,
 } from "@/lib/servicos";
-import { filtroDePropriedadeServico, identificarPrestador, podeGerirServico } from "@/lib/servicos/permissoes";
+import { filtroDePropriedadeServico, identificarPrestador, podeGerirServico, sincronizarMunicipioServicos } from "@/lib/servicos/permissoes";
 import { estadoAposRevisao } from "@/lib/servicos/transicoes";
 
 const PAINEL = "/painel/servicos";
@@ -50,7 +50,13 @@ export async function salvarPerfilProfissional(_estado: EstadoFormulario, dados:
       create: { usuarioId: usuario.id, ...perfil, cidade: municipio.nome, uf: municipio.uf },
       update: { ...perfil, cidade: municipio.nome, uf: municipio.uf },
     });
-    // Alterações na identidade/contato do prestador exigem nova análise dos anúncios.
+    // O município exibido pelos anúncios (inclusive pendentes, rejeitados e suspensos)
+    // não pode ficar desatualizado após a alteração do perfil.
+    if (anterior && (anterior.cidade !== municipio.nome || anterior.uf !== municipio.uf)) {
+      await sincronizarMunicipioServicos(tx, usuario.id, municipio);
+    }
+    // Mudanças em dados públicos exigem nova análise apenas dos publicados;
+    // não revertem suspensões ou recusas anteriores.
     if (alterouInformacaoPublica) {
       await tx.servico.updateMany({
         where: { perfilUsuarioId: usuario.id, status: "publicado" },
