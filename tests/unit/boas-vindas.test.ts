@@ -1,4 +1,8 @@
+import { readFileSync } from "node:fs";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import { SeloStatus } from "@/components/SeloStatus";
 import { checklistDoPerfil } from "@/lib/boas-vindas";
 
 const RECEM_ASSUMIDO = { fotoUrl: null, historia: "", causas: [], oficial: false, moderacao: "aprovada" };
@@ -54,5 +58,23 @@ describe("checklistDoPerfil", () => {
   it("sem o Entrar com Instagram, não pede o selo", () => {
     expect(checklistDoPerfil(RECEM_ASSUMIDO, false)).toMatchObject({ pedirSelo: false, mostrar: true });
     expect(checklistDoPerfil({ ...COMPLETO, oficial: false }, false)).toMatchObject({ pedirSelo: false, mostrar: false });
+  });
+});
+
+describe("comunicação dos níveis de confiança", () => {
+  it("explica que o selo oficial não certifica identidade legal", () => {
+    const oficial = renderToStaticMarkup(createElement(SeloStatus, { status: "verificada", oficial: true }));
+    const assumido = renderToStaticMarkup(createElement(SeloStatus, { status: "verificada", oficial: false }));
+
+    expect(oficial).toContain("Perfil oficial");
+    expect(oficial).toContain("não certifica a identidade legal");
+    expect(assumido).toContain("Perfil assumido");
+    expect(assumido).not.toContain("Perfil oficial");
+  });
+
+  it("não promete comprovação de identidade no convite ao cadastro", () => {
+    const pagina = readFileSync(new URL("../../src/app/participar/page.tsx", import.meta.url), "utf8");
+    expect(pagina).toContain("A confirmação pelo Instagram é um processo separado.");
+    expect(pagina).not.toContain('titulo: "O perfil é seu."');
   });
 });
