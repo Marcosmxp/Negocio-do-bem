@@ -18,6 +18,7 @@ export type UsuarioSessao = {
   nome: string;
   email: string;
   moderador: boolean;
+  temPapelModeracao?: boolean;
   // Indicar, escrever e denunciar depoimentos e reivindicar pedem o e-mail confirmado.
   // Com CONFIRMACAO_DE_EMAIL_LIGADA desligada, é sempre true.
   emailConfirmado: boolean;
@@ -106,6 +107,7 @@ export const usuarioAtual = cache(async (): Promise<UsuarioSessao | null> => {
     email: usuario.email,
     // O privilégio só existe após MFA validado no servidor.
     moderador: ehModerador(usuario) && usuario.mfaAtivadoEm !== null && sessao.mfaVerificadoEm !== null,
+    temPapelModeracao: ehModerador(usuario),
     emailConfirmado: !CONFIRMACAO_DE_EMAIL_LIGADA || usuario.emailConfirmadoEm !== null,
   };
 });
