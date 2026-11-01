@@ -35,6 +35,7 @@ model Usuario {
   mfaAtivadoEm DateTime?
   mfaUltimoPeriodo Int?
   codigosRecuperacao MfaCodigoRecuperacao[]
+  limiteMfa MfaLimite?
 
   sessoes             Sessao[]
   links               LinkEmail[]
@@ -59,6 +60,13 @@ model Sessao {
   tentativasMfa Int @default(0)
 
   @@index([usuarioId])
+}
+
+model MfaLimite {
+  usuarioId String @id
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  contagem Int
+  janelaIniciadaEm DateTime
 }
 
 model MfaCodigoRecuperacao {
