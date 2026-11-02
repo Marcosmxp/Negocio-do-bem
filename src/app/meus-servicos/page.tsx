@@ -50,7 +50,7 @@ async function Conteudo({ searchParams }: Pick<PageProps<"/meus-servicos">, "sea
   const usuario = await exigirUsuario("/meus-servicos");
   const [perfil, membros] = await Promise.all([
     db.perfilProfissional.findUnique({ where: { usuarioId: usuario.id } }),
-    db.empresaMembro.findMany({ where: { usuarioId: usuario.id }, include: { empresa: true } }),
+    db.empresaMembro.findMany({ where: { usuarioId: usuario.id, papel: "dono" }, include: { empresa: true } }),
   ]);
   const empresas = membros.filter(({ empresa }) => empresa.status === "verificada" && empresa.moderacao === "aprovada" && !empresa.oculta)
     .map(({ empresa }) => ({ id: empresa.id, nome: empresa.nome }));
