@@ -49,8 +49,45 @@ describe("observador HTTP do cache de CNPJ por ficha", () => {
     expect(observar(ficha("pedido-1", `<script>${marcador}</script >`), "pedido-1").marcadorRenderizado).toBe(false);
   });
 
-  it("não aceita como visível o marcador dentro de um atributo que contém maior que", () => {
-    const html = ficha("pedido-1", `<b title="3 > ${marcador}">Outro dado</b>`);
+  it.each(['"', "'"])("não aceita como visível o marcador em atributo delimitado por %s", aspas => {
+    const html = ficha("pedido-1", `<b title=${aspas}3 > ${marcador}${aspas}>Outro dado</b>`);
+    expect(observar(html, "pedido-1").marcadorRenderizado).toBe(false);
+  });
+
+  it("não encontra o nome da empresa apenas em atributo", () => {
+    const html = ficha("pedido-1", marcador).replace(`<header>${empresa}</header>`, `<header title="3 > ${empresa}">Outra empresa</header>`);
+    expect(observar(html, "pedido-1").ficha).toBe(false);
+  });
+
+  it("preserva texto de elementos aninhados sem ler os atributos como texto", () => {
+    const html = ficha("pedido-1", `<b title="<span>falso</span>"><em>${marcador}</em></b>`);
+    expect(observar(html, "pedido-1").marcadorRenderizado).toBe(true);
+    const apenasAtributo = ficha("pedido-1", `<b><em title="3 > ${marcador}">Outro dado</em></b>`);
+    expect(observar(apenasAtributo, "pedido-1").marcadorRenderizado).toBe(false);
+  });
+
+  it.each(["style", "title", "textarea", "xmp", "iframe", "noembed", "noframes"])(
+    "não trata conteúdo de %s como elementos da ficha", nome => {
+      const html = ficha("pedido-1", "", `<${nome}><span>${marcador}</span></${nome}>`);
+      expect(observar(html, "pedido-1").marcadorRenderizado).toBe(false);
+    },
+  );
+
+  it("não fecha texto bruto com um nome de tag apenas semelhante", () => {
+    const html = ficha("pedido-1", "", `<style></style-falso><span>${marcador}</span></style>`);
+    expect(observar(html, "pedido-1").marcadorRenderizado).toBe(false);
+  });
+
+  it.each([
+    `<b title="3 > ${marcador}`,
+    `<!-- <span>${marcador}</span>`,
+    `<b>${marcador}</span>`,
+  ])("recusa fragmento incompleto ou desequilibrado em vez de aprovar a ficha: %s", trecho => {
+    expect(() => observar(ficha("pedido-1", trecho), "pedido-1")).toThrow(/estrutura-/);
+  });
+
+  it("não interpreta tags e scripts dentro de comentários", () => {
+    const html = ficha("pedido-1", `<!-- <script>falso</script ><span>${marcador}</span> -->`);
     expect(observar(html, "pedido-1").marcadorRenderizado).toBe(false);
   });
 

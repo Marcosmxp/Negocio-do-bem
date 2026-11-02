@@ -25,8 +25,9 @@ function fimDaTag(html, inicio) {
   return html.length;
 }
 
-// Lê o HTML do harness sem executar scripts. Não é um sanitizador para publicação.
+// Lê o HTML do harness sem executar scripts. Não garante conformidade com um navegador nem sanitização para publicação.
 function* partesHtml(html) {
+  const textoBruto = new Set(["script", "style", "title", "textarea", "xmp", "iframe", "noembed", "noframes"]);
   const cabeca = /<\/?([a-z][^\t\n\f\r />]*)/iy;
   let indice = 0;
   while (indice < html.length) {
@@ -55,8 +56,8 @@ function* partesHtml(html) {
     const abertura = html.slice(inicio, fim);
     indice = fim;
     let corpo;
-    if (nome === "script" && !fechamento) {
-      const terminador = /<\/script(?=[\t\n\f\r />])/gi;
+    if (textoBruto.has(nome) && !fechamento) {
+      const terminador = new RegExp(`</${nome}(?=[\\t\\n\\f\\r />])`, "gi");
       terminador.lastIndex = fim;
       const final = terminador.exec(html);
       corpo = html.slice(fim, final?.index ?? html.length);
