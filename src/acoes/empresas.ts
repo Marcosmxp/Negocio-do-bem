@@ -9,7 +9,7 @@ import { caminhoSeguro, exigirUsuario } from "@/lib/auth/sessao";
 import { AVISOS } from "@/lib/avisos";
 import { filtrarCausas } from "@/lib/causas";
 import { ErroFotoDescartada, OPCOES_TRANSACAO_FOTOS, validarReferenciasFotos } from "@/lib/publicacao-fotos";
-import { db } from "@/lib/db";
+import { db, type Prisma } from "@/lib/db";
 import { CATEGORIAS } from "@/lib/dominio";
 import {
   campoEmail,
@@ -222,8 +222,8 @@ async function exigirEditor(empresaId: string, voltarPara: string) {
 }
 
 /** Edições feitas pela moderação ficam marcadas na auditoria. */
-function auditarEdicao(usuarioId: string, empresa: { id: string; instagramUsername: string }, acao: string, pelaModeracao: boolean) {
-  return registrarAuditoria(db, {
+function auditarEdicao(tx: Prisma.TransactionClient, usuarioId: string, empresa: { id: string; instagramUsername: string }, acao: string, pelaModeracao: boolean) {
+  return registrarAuditoria(tx, {
     usuarioId,
     acao: pelaModeracao ? `${acao}_pela_moderacao` : acao,
     alvoTipo: "empresa",
@@ -262,12 +262,12 @@ export async function salvarEmpresa(_estado: EstadoFormulario, dados: FormData):
       });
       await tx.empresaCausa.deleteMany({ where: { empresaId: empresa.id } });
       await tx.empresaCausa.createMany({ data: causas.map((causa) => ({ empresaId: empresa.id, causa })) });
+      await auditarEdicao(tx, usuario.id, empresa, "empresa.editada", pelaModeracao);
     }, OPCOES_TRANSACAO_FOTOS);
   } catch (erro) {
     if (erro instanceof ErroFotoDescartada) return { erros: { [erro.campo === "site" ? "site" : "historia"]: erro.message }, valores };
     throw erro;
   }
-  await auditarEdicao(usuario.id, empresa, "empresa.editada", pelaModeracao);
 
   redirect(`${voltarDe(dados, empresa)}?aviso=salvo`);
 }
@@ -275,12 +275,14 @@ export async function salvarEmpresa(_estado: EstadoFormulario, dados: FormData):
 export async function alternarVisibilidade(dados: FormData): Promise<void> {
   const { usuario, empresa } = await exigirDono(texto(dados, "empresaId"), "/painel");
   const oculta = dados.get("ocultar") === "sim";
-  await db.empresa.update({ where: { id: empresa.id }, data: { oculta } });
-  await registrarAuditoria(db, {
-    usuarioId: usuario.id,
-    acao: oculta ? "empresa.ocultada" : "empresa.reexibida",
-    alvoTipo: "empresa",
-    alvoId: empresa.id,
+  await db.$transaction(async (tx) => {
+    await tx.empresa.update({ where: { id: empresa.id }, data: { oculta } });
+    await registrarAuditoria(tx, {
+      usuarioId: usuario.id,
+      acao: oculta ? "empresa.ocultada" : "empresa.reexibida",
+      alvoTipo: "empresa",
+      alvoId: empresa.id,
+    });
   });
   redirect(`/painel/${empresa.instagramUsername}?aviso=${oculta ? "oculta" : "visivel"}`);
 }
@@ -302,12 +304,12 @@ export async function trocarFoto(_estado: EstadoFormulario, dados: FormData): Pr
     await db.$transaction(async (tx) => {
       await validarReferenciasFotos(tx, { fotoUrl });
       await tx.empresa.update({ where: { id: empresa.id }, data: { fotoUrl } });
+      await auditarEdicao(tx, usuario.id, empresa, "empresa.foto_trocada", pelaModeracao);
     }, OPCOES_TRANSACAO_FOTOS);
   } catch (erro) {
     if (erro instanceof ErroFotoDescartada) return { erro: erro.message };
     throw erro;
   }
-  await auditarEdicao(usuario.id, empresa, "empresa.foto_trocada", pelaModeracao);
   redirect(`${voltarDe(dados, empresa)}?aviso=foto_salva`);
 }
 
@@ -317,8 +319,8 @@ export async function removerFoto(dados: FormData): Promise<void> {
   await db.$transaction(async (tx) => {
     await validarReferenciasFotos(tx, { fotoUrl: null });
     await tx.empresa.update({ where: { id: empresa.id }, data: { fotoUrl: null } });
+    await auditarEdicao(tx, usuario.id, empresa, "empresa.foto_removida", pelaModeracao);
   }, OPCOES_TRANSACAO_FOTOS);
-  await auditarEdicao(usuario.id, empresa, "empresa.foto_removida", pelaModeracao);
   redirect(`${voltarDe(dados, empresa)}?aviso=foto_removida`);
 }
 

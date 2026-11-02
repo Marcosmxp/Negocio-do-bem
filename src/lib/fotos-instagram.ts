@@ -56,18 +56,20 @@ export async function aplicarFotoDoInstagram(
 
   const fotoUrl = await guardarFoto(foto, "perfis");
   // O dono pode ter enviado uma foto enquanto esta subia: nesse caso, vale a dele.
-  const { count } = await db.$transaction(async (tx) => {
+  const gravada = await db.$transaction(async (tx) => {
     await validarReferenciasFotos(tx, { fotoUrl });
-    return tx.empresa.updateMany({ where: { id: empresaId, fotoUrl: null }, data: { fotoUrl } });
+    const { count } = await tx.empresa.updateMany({ where: { id: empresaId, fotoUrl: null }, data: { fotoUrl } });
+    if (count === 0) return false;
+    await registrarAuditoria(tx, {
+      usuarioId: null,
+      acao: "empresa.foto_do_instagram",
+      alvoTipo: "empresa",
+      alvoId: empresaId,
+      detalhes: `@${empresa.instagramUsername}`,
+    });
+    return true;
   }, OPCOES_TRANSACAO_FOTOS);
-  if (count === 0) return "ja_tem_foto";
-  await registrarAuditoria(db, {
-    usuarioId: null,
-    acao: "empresa.foto_do_instagram",
-    alvoTipo: "empresa",
-    alvoId: empresaId,
-    detalhes: `@${empresa.instagramUsername}`,
-  });
+  if (!gravada) return "ja_tem_foto";
   return "gravada";
 }
 
