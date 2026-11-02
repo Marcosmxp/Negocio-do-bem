@@ -267,12 +267,87 @@ describe("Entrar com Instagram", () => {
   });
 });
 
-describe("renovação durante aprovação com troca do ID do Instagram", () => {
+describe("aprovações concorrentes e renovação do Instagram", () => {
   function sinal() {
     let liberar!: () => void;
     const promessa = new Promise<void>((resolve) => { liberar = resolve; });
     return { promessa, liberar };
   }
+
+  it("preserva o selo oficial quando o documento é aprovado durante a confirmação pelo Instagram", async () => {
+    const instagram = await criarUsuario("Instagram");
+    const documento = await criarUsuario("Documento");
+    const moderador = await criarUsuario("Moderação");
+    const empresa = await criarEmpresa("selo.concorrente");
+    const criarPedido = (usuarioId: string, metodo: string) => db.reivindicacao.create({
+      data: {
+        empresaId: empresa.id, usuarioId, metodo,
+        instagramUserId: metodo === "instagram_login" ? "id-selo-concorrente" : null,
+        expiraEm: new Date(Date.now() + 60_000),
+      },
+    });
+    const pedidoInstagram = await criarPedido(instagram.id, "instagram_login");
+    const pedidoDocumento = await criarPedido(documento.id, "documento");
+    const instagramContou = sinal();
+    const continuarInstagram = sinal();
+    const documentoIniciou = sinal();
+    let transacoes = 0;
+    let pidInstagram = 0;
+    let pidDocumento = 0;
+
+    // A pausa mantém a trava real do Instagram enquanto o documento tenta aprovar.
+    const cliente = db.$extends({ query: {
+      empresaMembro: {
+        async count({ args, query }) {
+          const quantidade = await query(args);
+          const usuario = args.where?.usuarioId;
+          if (typeof usuario === "object" && usuario.not === instagram.id) {
+            instagramContou.liberar();
+            await continuarInstagram.promessa;
+          }
+          return quantidade;
+        },
+      },
+    } });
+    const transacionar = cliente.$transaction.bind(cliente);
+    vi.spyOn(db, "$transaction").mockImplementation(async (operacao, opcoes) => transacionar(async (tx) => {
+      const [{ pid }] = await tx.$queryRaw<{ pid: number }[]>`SELECT pg_backend_pid() AS pid`;
+      if (++transacoes === 1) pidInstagram = pid;
+      else {
+        pidDocumento = pid;
+        documentoIniciou.liberar();
+      }
+      return operacao(tx as unknown as Prisma.TransactionClient);
+    }, { ...opcoes, timeout: 12_000 }));
+
+    const resultados: Promise<PromiseSettledResult<unknown>[]>[] = [];
+    try {
+      resultados.push(Promise.allSettled([aprovar({ reivindicacaoId: pedidoInstagram.id, revisorId: null })]));
+      await instagramContou.promessa;
+      resultados.push(Promise.allSettled([aprovar({ reivindicacaoId: pedidoDocumento.id, revisorId: moderador.id })]));
+      await documentoIniciou.promessa;
+      await expect.poll(async () => {
+        const [{ bloqueadores }] = await db.$queryRaw<{ bloqueadores: number[] }[]>`
+          SELECT pg_blocking_pids(${pidDocumento}::int) AS bloqueadores`;
+        return bloqueadores;
+      }).toContain(pidInstagram);
+
+      continuarInstagram.liberar();
+      expect((await Promise.all(resultados)).flat()).toEqual([
+        { status: "fulfilled", value: undefined },
+        { status: "fulfilled", value: undefined },
+      ]);
+      expect(await donos(empresa.id)).toEqual([instagram.id, documento.id].sort());
+      expect(await db.empresa.findUniqueOrThrow({ where: { id: empresa.id } }))
+        .toMatchObject({ oficial: true, instagramUserId: "id-selo-concorrente" });
+      expect(await db.reivindicacao.count({ where: { empresaId: empresa.id, status: "aprovada" } })).toBe(2);
+      expect(await db.registroAuditoria.count({ where: { alvoId: empresa.id, acao: "reivindicacao.aprovada" } })).toBe(2);
+    } finally {
+      continuarInstagram.liberar();
+      await Promise.all(resultados);
+      vi.restoreAllMocks();
+    }
+  }, 15_000);
 
   it("renova o login do Instagram sem deadlock na mesma empresa", async () => {
     const pessoa = await criarUsuario();

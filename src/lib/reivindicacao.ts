@@ -265,10 +265,12 @@ export async function aprovar(params: {
     const { empresaId, usuarioId, instagramIgsid } = reivindicacao;
     const instagramUserId = params.instagramUserId ?? reivindicacao.instagramUserId;
 
-    if (revisorId === null && reivindicacao.metodo === "instagram_login") {
-      const empresas = await tx.$queryRaw<{ id: string }[]>`
-        SELECT id FROM "Empresa" WHERE id = ${empresaId} AND moderacao <> 'rejeitada' FOR UPDATE`;
-      if (empresas.length === 0) throw new NegocioRetiradoDoAr("Negócio não encontrado.");
+    // A mesma trava protege a contagem de donos e o selo em todos os caminhos.
+    const empresas = await tx.$queryRaw<{ moderacao: string }[]>`
+      SELECT moderacao FROM "Empresa" WHERE id = ${empresaId} FOR UPDATE`;
+    if (revisorId === null && reivindicacao.metodo === "instagram_login" &&
+        (empresas.length === 0 || empresas[0].moderacao === "rejeitada")) {
+      throw new NegocioRetiradoDoAr("Negócio não encontrado.");
     }
 
     if (modo === "transferir") {
