@@ -13,7 +13,7 @@ import {
 import { filtroDePropriedadeServico, identificarPrestador, podeGerirServico, sincronizarMunicipioServicos } from "@/lib/servicos/permissoes";
 import { estadoAposRevisao } from "@/lib/servicos/transicoes";
 
-const PAINEL = "/painel/servicos";
+const PAINEL = "/meus-servicos";
 const FILA = "/moderacao/servicos";
 
 function atualizarPaginas() {
