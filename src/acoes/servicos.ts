@@ -57,10 +57,10 @@ export async function salvarPerfilProfissional(_estado: EstadoFormulario, dados:
     }
     // Mudanças em dados públicos exigem nova análise apenas dos publicados;
     // não revertem suspensões ou recusas anteriores.
-    if (alterouInformacaoPublica) {
+    if (alterouInformacaoPublica || (anterior && anterior.publicado !== perfil.publicado)) {
       await tx.servico.updateMany({
-        where: { perfilUsuarioId: usuario.id, status: "publicado" },
-        data: { status: "pendente", cidade: municipio.nome, uf: municipio.uf, motivoRecusa: null, moderadoEm: null },
+        where: { perfilUsuarioId: usuario.id, status: { in: ["publicado", "pendente"] } },
+        data: { status: "pendente", cidade: municipio.nome, uf: municipio.uf, motivoRecusa: null, moderadoEm: null, versaoConteudo: { increment: 1 } },
       });
     }
     await registrarAuditoria(tx, {
@@ -100,8 +100,9 @@ export async function salvarServico(_estado: EstadoFormulario, dados: FormData):
         return { erro: "Não é permitido transferir um anúncio entre prestadores." };
       }
       await tx.servico.update({
-        where: { id, ...filtroDePropriedadeServico(usuario.id) },
+        where: { ...filtroDePropriedadeServico(usuario.id), id },
         data: {
+          versaoConteudo: { increment: 1 },
           ...conteudo, cidade: destino.cidade, uf: destino.uf,
           busca: buscaServico(conteudo),
           areasAtendimento: { deleteMany: {}, create: areasAtendimento },
@@ -157,17 +158,19 @@ export async function alternarServico(dados: FormData): Promise<void> {
 export async function moderarServico(dados: FormData): Promise<void> {
   const moderador = await exigirModerador();
   const id = texto(dados, "id");
+  const versaoTexto = texto(dados, "versaoConteudo");
+  const versaoConteudo = /^\d{1,9}$/.test(versaoTexto) ? Number(versaoTexto) : NaN;
   const validado = esquemaModeracaoServico.safeParse({
     decisao: texto(dados, "decisao"), motivo: texto(dados, "motivo"),
   });
-  if (!idServicoValido(id) || !validado.success) redirect(`${FILA}?aviso=dados_invalidos`);
+  if (!idServicoValido(id) || !Number.isSafeInteger(versaoConteudo) || versaoConteudo < 1 || !validado.success) redirect(`${FILA}?aviso=dados_invalidos`);
 
   const decisao = validado.data;
   const status = decisao.decisao === "aprovar" ? "publicado" : decisao.decisao === "suspender" ? "suspenso" : "rejeitado";
   const resultado = await db.$transaction(async (tx) => {
     const { count } = await tx.servico.updateMany({
       where: {
-        id, status: status === "suspenso" ? "publicado" : "pendente",
+        id, versaoConteudo, status: status === "suspenso" ? "publicado" : "pendente",
         ...(status === "publicado" ? {
           OR: [
             { perfil: { is: { publicado: true } } },
