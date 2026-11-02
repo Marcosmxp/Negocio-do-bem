@@ -41,7 +41,7 @@ async function Conteudo({ searchParams }: Pick<PageProps<"/moderacao/servicos">,
   const pendentes = await db.servico.findMany({
     where: { status: "pendente" },
     select: {
-      id: true, titulo: true, descricao: true, categoria: true,
+      id: true, versaoConteudo: true, titulo: true, descricao: true, categoria: true,
       cidade: true, uf: true, remoto: true, presencial: true, precoReferencia: true,
       perfil: { select: { nomePublico: true } }, empresa: { select: { nome: true } },
     },
@@ -51,7 +51,7 @@ async function Conteudo({ searchParams }: Pick<PageProps<"/moderacao/servicos">,
     <section className="mt-8 space-y-5">
       {params.aviso === "dados_invalidos" && <p role="alert" className="text-coral-700">Informe uma decisão e um motivo válido.</p>}
       {params.aviso === "feito" && <p role="status" className="rounded-xl bg-folha-50 p-3 text-sm text-folha">Decisão registrada com sucesso.</p>}
-      {params.aviso === "indisponivel" && <p role="alert" className="text-coral-700">O anúncio já foi analisado ou o prestador não pode publicá-lo.</p>}
+      {params.aviso === "indisponivel" && <p role="alert" className="text-coral-700">O anúncio mudou desde que foi aberto, já foi analisado ou o prestador não pode publicá-lo. Atualize a página e confira a versão mais recente.</p>}
       <p className="text-sm text-suave">{total} {total === 1 ? "anúncio pendente" : "anúncios pendentes"}</p>
       {pendentes.length === 0 ? (
         <p className="cartao p-8 text-center text-suave">Nenhum anúncio aguardando análise.</p>
@@ -74,11 +74,13 @@ async function Conteudo({ searchParams }: Pick<PageProps<"/moderacao/servicos">,
               <div className="grid gap-4 border-t border-linha pt-4 sm:grid-cols-2">
                 <form action={moderarServico} className="flex flex-col justify-end">
                   <input type="hidden" name="id" value={servico.id} />
+                  <input type="hidden" name="versaoConteudo" value={servico.versaoConteudo} />
                   <input type="hidden" name="decisao" value="aprovar" />
                   <BotaoEnviar className="botao-coral min-h-11 w-full"><IconeRede nome="verificar" className="h-4 w-4" /> Aprovar anúncio</BotaoEnviar>
                 </form>
                 <form action={moderarServico} className="space-y-2">
                   <input type="hidden" name="id" value={servico.id} />
+                  <input type="hidden" name="versaoConteudo" value={servico.versaoConteudo} />
                   <input type="hidden" name="decisao" value="rejeitar" />
                   <label htmlFor={`motivo-${servico.id}`} className="rotulo">Motivo da recusa</label>
                   <textarea id={`motivo-${servico.id}`} name="motivo" required minLength={10} maxLength={500} rows={2} className="campo w-full" placeholder="Explique o que deve ser corrigido." />
@@ -109,7 +111,7 @@ async function Publicados({ searchParams }: Pick<PageProps<"/moderacao/servicos"
   const itens = await db.servico.findMany({
     where,
     select: {
-      id: true, titulo: true, categoria: true, criadoEm: true,
+      id: true, versaoConteudo: true, titulo: true, categoria: true, criadoEm: true,
       perfil: { select: { nomePublico: true } },
       empresa: { select: { nome: true } },
     },
@@ -147,6 +149,7 @@ async function Publicados({ searchParams }: Pick<PageProps<"/moderacao/servicos"
               </div>
               <form action={moderarServico} className="space-y-2">
                 <input type="hidden" name="id" value={servico.id} />
+                  <input type="hidden" name="versaoConteudo" value={servico.versaoConteudo} />
                 <input type="hidden" name="decisao" value="suspender" />
                 <label htmlFor={`suspender-${servico.id}`} className="rotulo">Justificativa da suspensão</label>
                 <textarea id={`suspender-${servico.id}`} name="motivo" required minLength={10} maxLength={500} rows={2} className="campo w-full" placeholder="Descreva a regra violada e como corrigir." />
