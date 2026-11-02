@@ -13,6 +13,7 @@ const sessao = vi.hoisted(() => ({
 
 vi.mock("next/navigation", () => ({
   redirect: (url: string): never => { throw new Error("REDIRECT " + url); },
+  notFound: (): never => { throw new Error("NOT_FOUND"); },
 }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/lib/auth/sessao", async (orig) => ({
