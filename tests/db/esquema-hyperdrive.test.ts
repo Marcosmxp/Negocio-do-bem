@@ -1,5 +1,6 @@
 import { Client } from "pg";
 import { afterEach, expect, it, vi } from "vitest";
+import { URL_BANCO_TESTE } from "../banco-de-teste";
 
 const simbolo = Symbol.for("__cloudflare-context__");
 const globais = globalThis as unknown as Record<symbol, unknown>;
@@ -12,7 +13,7 @@ afterEach(() => {
 });
 
 it("usa o mesmo esquema no ORM e na trava SQL com URLs diferentes", async () => {
-  const url = process.env.TEST_DATABASE_URL!;
+  const url = URL_BANCO_TESTE;
   const cliente = new Client({ connectionString: url });
   await cliente.connect();
   await cliente.query('CREATE SCHEMA IF NOT EXISTS "prova_hyperdrive"');
