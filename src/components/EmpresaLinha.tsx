@@ -22,7 +22,12 @@ export function EmpresaLinha({ empresa }: { empresa: EmpresaResumo }) {
                 />
               </svg>
             ) : (
-              <span role="img" aria-label="Perfil assumido" className="shrink-0 text-suave">
+              <span
+                role="img"
+                aria-label="Perfil assumido"
+                title="Uma conta assumiu o perfil. Identidade e causas não certificadas."
+                className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-linha bg-superficie text-sm text-suave"
+              >
                 •
               </span>
             ))}
