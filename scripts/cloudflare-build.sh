@@ -11,6 +11,8 @@
 # o DEPLOY_ENV.
 set -e
 
+node scripts/corrigir-opennext.mjs
+
 if [ -n "$WORKERS_CI_BRANCH" ]; then
   if [ "$WORKERS_CI_BRANCH" = "main" ]; then
     DEPLOY_ENV=production
@@ -63,4 +65,4 @@ sed 's|^\( *output *= .*\)$|\1\n  runtime  = "cloudflare"|' prisma/schema.prisma
 trap 'rm -f prisma/schema.cloudflare.prisma; npx prisma generate > /dev/null' EXIT
 npx prisma generate --schema prisma/schema.cloudflare.prisma
 
-npx opennextjs-cloudflare build
+npx opennextjs-cloudflare build "$@"
