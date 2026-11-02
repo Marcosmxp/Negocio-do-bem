@@ -1026,3 +1026,11 @@ Pedidos de orçamento, denúncias, contratos, avaliações, histórico de servi�
 - A validação contempla municípios repetidos, município inválido, presença de modalidade, operações suspensas e pesquisa geográfica.
 - Antes do merge: executar migrações num PostgreSQL descartável, lint, typecheck, testes e build; testar navegação por teclado e leitor de ecrã, 360/375/768/1280 px, claro/escuro e o fluxo de suspensão.
 - Dependências: a #137 propõe `confirmadoEm` para proprietários; quando integrada, serviços de empresas também precisarão dessa verificação, sem novo sistema de permissões. A #168 pode fornecer identificação territorial adicional sem fazer parte do MVP.
+
+### PR #87 — Correções de integração e regressão
+
+- A branch foi integrada à `stage` com um merge que preserva funcionalidades já publicadas, incluindo PWA, copy de identidade e navegação.
+- A decisão de moderação usa `versaoConteudo` validado em `updateMany` para impedir aprovação de conteúdo posterior à consulta do moderador.
+- O painel de serviços foi movido para `/meus-servicos`, sem reservar identificadores do Instagram válidos sob `/painel/[usuario]`.
+- Os testes das actions reais cobrem alterações de anúncio/perfil durante a análise, aprovações concorrentes, propriedade e colisão de rotas.
+- Os alvos de auditoria passaram a resolver serviços e perfis profissionais, preservando o histórico de decisões.
