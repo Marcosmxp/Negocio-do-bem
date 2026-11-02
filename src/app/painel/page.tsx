@@ -69,7 +69,7 @@ async function Conteudo({ searchParams }: Pick<PageProps<"/painel">, "searchPara
           <h2 className="font-serif text-xl font-semibold">Meus serviços</h2>
           <p className="mt-1 text-sm text-suave">Cadastre seu perfil profissional e ofereça serviços à comunidade.</p>
         </div>
-        <Link href="/painel/servicos" className="botao-coral min-h-11 shrink-0">Gerenciar serviços</Link>
+        <Link href="/meus-servicos" className="botao-coral min-h-11 shrink-0">Gerenciar serviços</Link>
       </section>
       <p className="text-suave">Olá, {usuario.nome.split(" ")[0]}! Aqui você cuida dos seus negócios e acompanha suas indicações.</p>
 
