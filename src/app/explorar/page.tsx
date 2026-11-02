@@ -154,7 +154,7 @@ function Filtros({ filtros, resultado }: { filtros: FiltrosDiretorio; resultado:
         </section>
       ))}
       <div className="cortejo-guia-filtroFinal">
-        <OpcaoFiltro href={mudarFiltro(filtros, { verificados: !filtros.verificados })} ativo={filtros.verificados} total={resultado.verificados}>Só verificados pelo dono</OpcaoFiltro>
+        <OpcaoFiltro href={mudarFiltro(filtros, { verificados: !filtros.verificados })} ativo={filtros.verificados} total={resultado.verificados}>Só perfis assumidos</OpcaoFiltro>
         {(filtros.tipos.length > 0 || filtros.causas.length > 0 || filtros.verificados) && <Link href={mudarFiltro(filtros, { tipos: [], causas: [], verificados: false })} scroll={false} rel="nofollow" className="link self-center text-sm font-semibold">Limpar tipos e causas</Link>}
       </div>
     </div>
@@ -196,8 +196,10 @@ function filtrosAtivos(filtros: FiltrosDiretorio, local: Local | null) {
   if (filtros.q) ativos.push({ rotulo: `“${filtros.q}”`, href: mudarFiltro(filtros, { q: "" }) });
   if (filtros.onde) ativos.push({ rotulo: local?.rotulo ?? filtros.onde, href: mudarFiltro(filtros, { onde: "" }) });
   for (const tipo of filtros.tipos) ativos.push({ rotulo: tipo, href: mudarFiltro(filtros, { tipos: alternar(filtros.tipos, tipo) }) });
-  for (const causa of filtros.causas) ativos.push({ rotulo: buscarCausa(causa)?.nome ?? causa, href: mudarFiltro(filtros, { causas: alternar(filtros.causas, causa) }) });
-  if (filtros.verificados) ativos.push({ rotulo: "Só verificados", href: mudarFiltro(filtros, { verificados: false }) });
+  for (const causa of filtros.causas) {
+    ativos.push({ rotulo: buscarCausa(causa)?.nome ?? causa, href: mudarFiltro(filtros, { causas: alternar(filtros.causas, causa) }) });
+  }
+  if (filtros.verificados) ativos.push({ rotulo: "Só perfis assumidos", href: mudarFiltro(filtros, { verificados: false }) });
   return ativos;
 }
 
