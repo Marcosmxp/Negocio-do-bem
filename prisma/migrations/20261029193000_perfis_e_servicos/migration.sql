@@ -30,6 +30,7 @@ CREATE TABLE "Servico" (
   "precoReferencia" TEXT,
   "busca" TEXT NOT NULL DEFAULT '',
   "status" TEXT NOT NULL DEFAULT 'pendente',
+  "versaoConteudo" INTEGER NOT NULL DEFAULT 1,
   "oculto" BOOLEAN NOT NULL DEFAULT false,
   "motivoRecusa" TEXT,
   "motivoSuspensao" TEXT,
