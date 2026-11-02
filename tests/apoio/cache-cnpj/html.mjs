@@ -129,13 +129,15 @@ function segmentosConcluidos(html) {
   for (const script of tags(html, "script")) {
     const tipo = atributo(script.abertura, "type");
     if (tipo && !/^(?:text|application)\/javascript$/i.test(tipo)) continue;
-    const chamada = script.corpo.match(/\$RC\("([\w:.-]*B:[0-9a-f]+)","([\w:.-]*S:[0-9a-f]+)"\)\s*;?\s*$/);
+    const chamada = script.corpo.match(/\$R(C|S)\("([\w:.-]*[BS]:[0-9a-f]+)","([\w:.-]*[SP]:[0-9a-f]+)"\)\s*;?\s*$/);
     if (!chamada) continue;
     const prefixo = script.corpo.slice(0, chamada.index).trim();
-    if (prefixo && !prefixo.startsWith("$RB=[];$RV=function(")) continue;
-    exigir(chamada[2] === chamada[1].replace(/B:([0-9a-f]+)$/, "S:$1"), "segmento-correlacionado");
-    exigir(!pares.has(chamada[1]), "segmento-correlacionado-unico");
-    pares.set(chamada[1], chamada[2]);
+    const mover = chamada[1] === "S";
+    if (prefixo && !prefixo.startsWith(mover ? "$RS=function(" : "$RB=[];$RV=function(")) continue;
+    const [limite, segmento] = mover ? [chamada[3], chamada[2]] : [chamada[2], chamada[3]];
+    exigir(/S:[0-9a-f]+$/.test(segmento) && limite === segmento.replace(/S:([0-9a-f]+)$/, mover ? "P:$1" : "B:$1"), "segmento-correlacionado");
+    exigir(!pares.has(limite), "segmento-correlacionado-unico");
+    pares.set(limite, segmento);
   }
   return pares;
 }
@@ -150,12 +152,19 @@ export function observarFila(html, empresa, pedido, marcador) {
   const pares = segmentosConcluidos(html);
   const segmentos = elementos(renderizado, "div");
   const limites = tags(renderizado, "template");
-  const ancestraisOcultos = segmentos.filter(segmento =>
-    segmento.inicio < ficha.inicio && segmento.fim > ficha.fim && /\shidden(?:\s|=|>)/.test(segmento.abertura));
-  if (!ancestraisOcultos.every(segmento => {
+  const ancestraisOcultos = trecho => segmentos.filter(segmento =>
+    segmento.inicio <= trecho.inicio && segmento.fim >= trecho.fim && /\shidden(?:\s|=|>)/.test(segmento.abertura));
+  function segmentoConcluido(segmento, visitados = new Set()) {
     const id = atributo(segmento.abertura, "id");
-    return id && limites.some(limite => pares.get(atributo(limite.abertura, "id")) === id);
-  })) return { ficha: false, controles: false, marcadorRenderizado: false };
+    if (!id || visitados.has(id)) return false;
+    const destinos = limites.filter(limite => pares.get(atributo(limite.abertura, "id")) === id);
+    if (destinos.length !== 1) return false;
+    const proximos = new Set(visitados).add(id);
+    return ancestraisOcultos(destinos[0]).every(ancestral => segmentoConcluido(ancestral, proximos));
+  }
+  if (!ancestraisOcultos(ficha).every(segmento => segmentoConcluido(segmento))) {
+    return { ficha: false, controles: false, marcadorRenderizado: false };
+  }
   const ids = tags(ficha.corpo, "input").map(tag => tag.abertura)
     .filter(tag => atributo(tag, "name") === "reivindicacaoId").map(tag => atributo(tag, "value"));
   exigir(ids.every(id => id === pedido), "pedido-pertence-a-uma-ficha");

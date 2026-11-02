@@ -163,6 +163,37 @@ describe("observador HTTP do cache de CNPJ por ficha", () => {
     expect(observar(html, "pedido-1")).toEqual({ ficha: false, controles: false, marcadorRenderizado: false });
   });
 
+  it("aceita a cadeia React capturada no HTTP: S:2 para P:2 dentro de S:1 concluído em B:1", () => {
+    const html = '<template id="B:1"></template><div hidden id="S:1"><template id="P:2"></template></div>' +
+      `<div hidden id="S:2">${ficha("pedido-1", marcador)}</div>` +
+      '<script>$RS=function(a,b){};$RS("S:2","P:2")</script><script>$RC("B:1","S:1")</script>';
+    expect(observar(html, "pedido-1")).toEqual({ ficha: true, controles: true, marcadorRenderizado: true });
+  });
+
+  it("não aprova a cadeia S/P se o segmento que contém o placeholder continua oculto", () => {
+    const html = '<template id="B:1"></template><div hidden id="S:1"><template id="P:2"></template></div>' +
+      `<div hidden id="S:2">${ficha("pedido-1", marcador)}</div>` + '<script>$RS("S:2","P:2")</script>';
+    expect(observar(html, "pedido-1")).toEqual({ ficha: false, controles: false, marcadorRenderizado: false });
+  });
+
+  it("não aceita uma instrução S/P existente apenas no payload RSC", () => {
+    const html = '<template id="P:2"></template>' + `<div hidden id="S:2">${ficha("pedido-1", marcador)}</div>` +
+      `<script>self.__next_f.push([1,${JSON.stringify('$RS("S:2","P:2")')}])</script>`;
+    expect(observar(html, "pedido-1")).toEqual({ ficha: false, controles: false, marcadorRenderizado: false });
+  });
+
+  it("recusa uma conclusão S/P com identificadores que não correspondem", () => {
+    const html = '<template id="P:3"></template>' + `<div hidden id="S:2">${ficha("pedido-1", marcador)}</div>` +
+      '<script>$RS("S:2","P:3")</script>';
+    expect(() => observar(html, "pedido-1")).toThrow(/segmento-correlacionado/);
+  });
+
+  it("não aprova um ciclo entre segmento oculto e seu próprio placeholder", () => {
+    const html = `<div hidden id="S:2"><template id="P:2"></template>${ficha("pedido-1", marcador)}</div>` +
+      '<script>$RS("S:2","P:2")</script>';
+    expect(observar(html, "pedido-1")).toEqual({ ficha: false, controles: false, marcadorRenderizado: false });
+  });
+
   it("recusa uma ficha duplicada em vez de escolher arbitrariamente uma ocorrência", () => {
     const html = ficha("pedido-1", marcador) + ficha("pedido-1", marcador);
     expect(() => observar(html, "pedido-1")).toThrow(/ficha.*unica|ficha.*única/);
