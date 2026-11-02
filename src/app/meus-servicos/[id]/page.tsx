@@ -30,13 +30,13 @@ async function Conteudo({ params }: Pick<PageProps<"/meus-servicos/[id]">, "para
         id,
         OR: [
           { perfilUsuarioId: usuario.id },
-          { empresa: { is: { membros: { some: { usuarioId: usuario.id } } } } },
+          { empresa: { is: { membros: { some: { usuarioId: usuario.id, papel: "dono" } } } } },
         ],
       },
     }),
     db.perfilProfissional.findUnique({ where: { usuarioId: usuario.id }, select: { publicado: true } }),
     db.empresaMembro.findMany({
-      where: { usuarioId: usuario.id },
+      where: { usuarioId: usuario.id, papel: "dono" },
       include: { empresa: { select: { id: true, nome: true, status: true, moderacao: true, oculta: true } } },
     }),
   ]);
