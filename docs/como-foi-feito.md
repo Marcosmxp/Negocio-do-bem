@@ -887,7 +887,7 @@ A funcionalidade reaproveita `Usuario`, `Empresa`, `EmpresaMembro`, autenticaç�
 - `src/lib/servicos/consultas.ts` é **server-only** e fornece o filtro público reutilizável com consulta paginada e ordenação estável.
 - `src/lib/servicos/transicoes.ts` documenta e testa as transições válidas entre estados.
 - `src/acoes/servicos.ts` autentica, valida os dados recebidos, chama as regras no banco numa transação e regista auditoria, mantendo redirecionamentos e revalidação das páginas fora da transação.
-- As páginas em `src/app/servicos`, `src/app/painel/servicos` e `src/app/moderacao/servicos` seguem a convenção do projeto de colocar acesso ao banco e à sessão dentro de `Suspense`.
+- As páginas em `src/app/servicos`, `src/app/meus-servicos` e `src/app/moderacao/servicos` seguem a convenção do projeto de colocar acesso ao banco e à sessão dentro de `Suspense`.
 - `FormularioServico` é reutilizado para criar e rever anúncios. Revisões reenviam o anúncio à moderação; o prestador é imutável.
 
 ### Moderação e privacidade
