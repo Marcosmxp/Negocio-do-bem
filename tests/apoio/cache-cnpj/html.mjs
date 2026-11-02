@@ -13,9 +13,70 @@ export function atributo(tag, nome) {
   const resultado = tag.match(new RegExp(`(?:^|\\s)${nome}=(?:"([^"]*)"|'([^']*)')`, "i"));
   return resultado ? decodificar(resultado[1] ?? resultado[2] ?? "") : undefined;
 }
+function fimDaTag(html, inicio) {
+  let aspas;
+  for (let i = inicio + 1; i < html.length; i++) {
+    const caractere = html[i];
+    if (aspas) {
+      if (caractere === aspas) aspas = undefined;
+    } else if (caractere === '"' || caractere === "'") aspas = caractere;
+    else if (caractere === ">") return i + 1;
+  }
+  return html.length;
+}
+
+// Lê o HTML do harness sem executar scripts. Não é um sanitizador para publicação.
+function* partesHtml(html) {
+  const cabeca = /<\/?([a-z][^\t\n\f\r />]*)/iy;
+  let indice = 0;
+  while (indice < html.length) {
+    const inicio = html.indexOf("<", indice);
+    if (inicio < 0) {
+      yield { texto: true, conteudo: html.slice(indice) };
+      return;
+    }
+    if (inicio > indice) yield { texto: true, conteudo: html.slice(indice, inicio) };
+    if (html.startsWith("<!--", inicio)) {
+      const fechamento = html.indexOf("-->", inicio + 4);
+      indice = fechamento < 0 ? html.length : fechamento + 3;
+      yield { comentario: true, conteudo: html.slice(inicio, indice) };
+      continue;
+    }
+    cabeca.lastIndex = inicio;
+    const resultado = cabeca.exec(html);
+    if (!resultado) {
+      yield { texto: true, conteudo: "<" };
+      indice = inicio + 1;
+      continue;
+    }
+    const nome = resultado[1].toLowerCase();
+    const fechamento = html[inicio + 1] === "/";
+    const fim = fimDaTag(html, inicio);
+    const abertura = html.slice(inicio, fim);
+    indice = fim;
+    let corpo;
+    if (nome === "script" && !fechamento) {
+      const terminador = /<\/script(?=[\t\n\f\r />])/gi;
+      terminador.lastIndex = fim;
+      const final = terminador.exec(html);
+      corpo = html.slice(fim, final?.index ?? html.length);
+      indice = final ? fimDaTag(html, final.index) : html.length;
+    }
+    yield { nome, fechamento, abertura, corpo, inicio, fim: indice, conteudo: html.slice(inicio, indice) };
+  }
+}
+
+function tags(html, nome) {
+  return [...partesHtml(html)].filter(parte => parte.nome === nome && !parte.fechamento);
+}
+
+function textoVisivel(html) {
+  return decodificar([...partesHtml(html)].filter(parte => parte.texto).map(parte => parte.conteudo).join(""));
+}
+
 export function formularioDeEntrada(html, pagina) {
-  const candidatos = [...html.matchAll(/<form\b([^>]*)>([\s\S]*?)<\/form>/gi)]
-    .map((trecho) => ({ atributos: trecho[1], entradas: [...trecho[2].matchAll(/<input\b[^>]*>/gi)].map(m => m[0]) }))
+  const candidatos = elementos(html, "form")
+    .map(trecho => ({ atributos: trecho.abertura, entradas: tags(trecho.corpo, "input").map(tag => tag.abertura) }))
     .filter(({ entradas }) => {
       const nomes = entradas.map(tag => atributo(tag, "name"));
       return nomes.includes("email") && nomes.includes("senha");
@@ -34,23 +95,22 @@ export function formularioDeEntrada(html, pagina) {
   return { destino, dados };
 }
 export function sanitizarHtml(html) {
-  return html.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, "<!-- script omitido -->")
-    .replace(/<input\b[^>]*>/gi, tag => {
-      const nome = atributo(tag, "name");
-      if (!nome?.startsWith("$ACTION")) return tag;
-      return tag.replace(/\bvalue=(?:"[^"]*"|'[^']*')/gi, 'value="[omitido]"');
-    });
+  return [...partesHtml(html)].map(parte => {
+    if (parte.nome === "script" && !parte.fechamento) return "<!-- script omitido -->";
+    if (parte.nome !== "input" || !atributo(parte.abertura, "name")?.startsWith("$ACTION")) return parte.conteudo;
+    return parte.abertura.replace(/\bvalue=(?:"[^"]*"|'[^']*')/gi, 'value="[omitido]"');
+  }).join("");
 }
 function elementos(html, nome) {
   const encontrados = [];
   const abertos = [];
-  const tags = new RegExp(`<${nome}\\b[^>]*>|<\\/${nome}\\s*>`, "gi");
-  for (const tag of html.matchAll(tags)) {
-    if (!tag[0].startsWith("</")) abertos.push({ abertura: tag[0], inicio: tag.index + tag[0].length });
+  for (const tag of partesHtml(html)) {
+    if (tag.nome !== nome) continue;
+    if (!tag.fechamento) abertos.push({ abertura: tag.abertura, inicio: tag.fim });
     else {
       const aberto = abertos.pop();
       exigir(aberto, `estrutura-${nome}`);
-      encontrados.push({ abertura: aberto.abertura, corpo: html.slice(aberto.inicio, tag.index) });
+      encontrados.push({ abertura: aberto.abertura, corpo: html.slice(aberto.inicio, tag.inicio) });
     }
   }
   exigir(abertos.length === 0, `estrutura-${nome}`);
@@ -58,19 +118,19 @@ function elementos(html, nome) {
 }
 
 function pedidoNoFormulario(formulario, pedido) {
-  return [...formulario.corpo.matchAll(/<input\b[^>]*>/gi)]
-    .some(tag => atributo(tag[0], "name") === "reivindicacaoId" && atributo(tag[0], "value") === pedido);
+  return tags(formulario.corpo, "input")
+    .some(tag => atributo(tag.abertura, "name") === "reivindicacaoId" && atributo(tag.abertura, "value") === pedido);
 }
 
 /** Lê apenas a instrução de conclusão emitida pelo React instalado, sem executar JavaScript. */
 function segmentosConcluidos(html) {
   const pares = new Map();
-  for (const script of html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)) {
-    const tipo = atributo(script[1], "type");
+  for (const script of tags(html, "script")) {
+    const tipo = atributo(script.abertura, "type");
     if (tipo && !/^(?:text|application)\/javascript$/i.test(tipo)) continue;
-    const chamada = script[2].match(/\$RC\("([\w:.-]*B:[0-9a-f]+)","([\w:.-]*S:[0-9a-f]+)"\)\s*;?\s*$/);
+    const chamada = script.corpo.match(/\$RC\("([\w:.-]*B:[0-9a-f]+)","([\w:.-]*S:[0-9a-f]+)"\)\s*;?\s*$/);
     if (!chamada) continue;
-    const prefixo = script[2].slice(0, chamada.index).trim();
+    const prefixo = script.corpo.slice(0, chamada.index).trim();
     if (prefixo && !prefixo.startsWith("$RB=[];$RV=function(")) continue;
     exigir(chamada[2] === chamada[1].replace(/B:([0-9a-f]+)$/, "S:$1"), "segmento-correlacionado");
     exigir(!pares.has(chamada[1]), "segmento-correlacionado-unico");
@@ -80,23 +140,23 @@ function segmentosConcluidos(html) {
 }
 
 export function observarFila(html, empresa, pedido, marcador) {
-  const renderizado = sanitizarHtml(html).replace(/<!--[\s\S]*?-->/g, "");
+  const renderizado = sanitizarHtml(html);
   const fichas = elementos(renderizado, "article").filter(ficha =>
     elementos(ficha.corpo, "form").some(formulario => pedidoNoFormulario(formulario, pedido)));
   exigir(fichas.length <= 1, "ficha-unica");
   if (!fichas.length) return { ficha: false, controles: false, marcadorRenderizado: false };
   const ficha = fichas[0];
-  const ids = [...ficha.corpo.matchAll(/<input\b[^>]*>/gi)].map(tag => tag[0])
+  const ids = tags(ficha.corpo, "input").map(tag => tag.abertura)
     .filter(tag => atributo(tag, "name") === "reivindicacaoId").map(tag => atributo(tag, "value"));
   exigir(ids.every(id => id === pedido), "pedido-pertence-a-uma-ficha");
   const formularios = elementos(ficha.corpo, "form").filter(formulario => pedidoNoFormulario(formulario, pedido));
   const controles = ["modo", "motivo"].every(nome => formularios.some(formulario =>
-    [...formulario.corpo.matchAll(/<input\b[^>]*>/gi)].some(tag => atributo(tag[0], "name") === nome)));
+    tags(formulario.corpo, "input").some(tag => atributo(tag.abertura, "name") === nome)));
   const pares = segmentosConcluidos(html);
   const segmentos = elementos(renderizado, "div");
   let dados = ficha.corpo;
-  for (const limite of ficha.corpo.matchAll(/<template\b[^>]*>/gi)) {
-    const id = atributo(limite[0], "id");
+  for (const limite of tags(ficha.corpo, "template")) {
+    const id = atributo(limite.abertura, "id");
     if (!id || !id.includes("B:")) continue;
     exigir(/^[\w:.-]*B:[0-9a-f]+$/.test(id), "segmento-correlacionado-formato");
     exigir(pares.has(id), "segmento-correlacionado-a-ficha");
@@ -105,9 +165,8 @@ export function observarFila(html, empresa, pedido, marcador) {
     dados += encontrados[0].corpo;
   }
   return {
-    ficha: decodificar(ficha.corpo.replace(/<[^>]*>/g, "")).includes(empresa),
+    ficha: textoVisivel(ficha.corpo).includes(empresa),
     controles,
-    marcadorRenderizado: elementos(dados, "span").some(trecho =>
-      decodificar(trecho.corpo.replace(/<[^>]*>/g, "")).includes(marcador)),
+    marcadorRenderizado: elementos(dados, "span").some(trecho => textoVisivel(trecho.corpo).includes(marcador)),
   };
 }

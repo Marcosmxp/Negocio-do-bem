@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { observarFila } from "../apoio/cache-cnpj/html.mjs";
+import { formularioDeEntrada, observarFila, sanitizarHtml } from "../apoio/cache-cnpj/html.mjs";
 
 const empresa = "Empresa sintética";
 const marcador = "RECEITA_SINTETICA";
@@ -39,6 +39,51 @@ describe("observador HTTP do cache de CNPJ por ficha", () => {
   it("não aceita o marcador existente somente em payload RSC", () => {
     const html = ficha("pedido-1") + `<script>self.__next_f.push([1,${JSON.stringify(`<span>${marcador}</span>`)}])</script>`;
     expect(observar(html, "pedido-1").marcadorRenderizado).toBe(false);
+  });
+
+  it("omite scripts com espaço no fechamento do registro de diagnóstico", () => {
+    expect(sanitizarHtml(`<script>${marcador}</script >`)).toBe("<!-- script omitido -->");
+  });
+
+  it("não aceita como visível o marcador em script com espaço no fechamento", () => {
+    expect(observar(ficha("pedido-1", `<script>${marcador}</script >`), "pedido-1").marcadorRenderizado).toBe(false);
+  });
+
+  it("não aceita como visível o marcador dentro de um atributo que contém maior que", () => {
+    const html = ficha("pedido-1", `<b title="3 > ${marcador}">Outro dado</b>`);
+    expect(observar(html, "pedido-1").marcadorRenderizado).toBe(false);
+  });
+
+  it.each([
+    `<SCRIPT title="3 > 2">${marcador}</SCRIPT \t>`,
+    `<script>${marcador}</script ignorado>`,
+    `<script>${marcador}`,
+  ])("omite o conteúdo do script sem executar JavaScript: %s", script => {
+    expect(sanitizarHtml(script)).toBe("<!-- script omitido -->");
+  });
+
+  it("preserva o texto visível depois de um atributo com maior que", () => {
+    const html = ficha("pedido-1", `<b title="3 > 2">${marcador}</b>`);
+    expect(observar(html, "pedido-1").marcadorRenderizado).toBe(true);
+  });
+
+  it("lê o formulário e omite o seletor com maior que em outro atributo", () => {
+    const html = '<form title="3 > 2" method="post"><input title="3 > 2" name="email"><input name="senha"><input title="3 > 2" type="hidden" name="$ACTION_ID_prova" value="seletor-sintetico"></form>';
+    const formulario = formularioDeEntrada(html, "https://exemplo.test/entrar");
+    expect(formulario.destino.href).toBe("https://exemplo.test/entrar");
+    expect(formulario.dados.get("$ACTION_ID_prova")).toBe("seletor-sintetico");
+    expect(sanitizarHtml(html)).not.toContain("seletor-sintetico");
+  });
+
+  it("não lê comentários como elementos visíveis", () => {
+    const html = ficha("pedido-1", `<!-- <span>${marcador}</span> -->`);
+    expect(observar(html, "pedido-1").marcadorRenderizado).toBe(false);
+  });
+
+  it("lê conclusão de segmento com espaço no fechamento do script", () => {
+    const html = ficha("pedido-1", "", '<template id="B:1"></template>') +
+      `<div hidden id="S:1"><span>${marcador}</span></div>` + '<script>$RC("B:1","S:1")</script >';
+    expect(observar(html, "pedido-1").marcadorRenderizado).toBe(true);
   });
 
   it("associa o segmento concluído do Next somente ao limite da ficha correspondente", () => {
