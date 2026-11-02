@@ -35,7 +35,7 @@ export default function Servicos(props: PageProps<"/servicos">) {
             <p className="mt-5 max-w-2xl text-base leading-relaxed text-suave sm:text-lg">
               Conecte-se a profissionais e negócios da comunidade. Descubra serviços, valorize talentos e fortaleça a economia local.
             </p>
-            <Link href="/painel/servicos" className="botao-coral mt-7 min-h-12 w-full px-6 sm:w-auto">
+            <Link href="/meus-servicos" className="botao-coral mt-7 min-h-12 w-full px-6 sm:w-auto">
               <IconeRede nome="adicionar" className="h-5 w-5" /> Oferecer um serviço
               <IconeRede nome="seta" className="h-4 w-4" />
             </Link>
@@ -146,7 +146,7 @@ async function Lista({ searchParams }: Pick<PageProps<"/servicos">, "searchParam
           <p className="mt-2 max-w-md text-sm leading-relaxed text-suave">Tente outra palavra ou categoria. Você também pode ser um dos primeiros a oferecer serviços à comunidade.</p>
           <div className="mt-5 flex w-full flex-col justify-center gap-2 sm:w-auto sm:flex-row">
             <Link className="botao-claro min-h-11" href="/servicos">Limpar filtros</Link>
-            <Link className="botao-coral min-h-11" href="/painel/servicos">Oferecer serviço</Link>
+            <Link className="botao-coral min-h-11" href="/meus-servicos">Oferecer serviço</Link>
           </div>
         </div>
       ) : (
