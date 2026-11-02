@@ -111,7 +111,7 @@ function elementos(html, nome) {
     else {
       const aberto = abertos.pop();
       exigir(aberto, `estrutura-${nome}`);
-      encontrados.push({ abertura: aberto.abertura, corpo: html.slice(aberto.inicio, tag.inicio) });
+      encontrados.push({ abertura: aberto.abertura, corpo: html.slice(aberto.inicio, tag.inicio), inicio: aberto.inicio, fim: tag.inicio });
     }
   }
   exigir(abertos.length === 0, `estrutura-${nome}`);
@@ -147,14 +147,21 @@ export function observarFila(html, empresa, pedido, marcador) {
   exigir(fichas.length <= 1, "ficha-unica");
   if (!fichas.length) return { ficha: false, controles: false, marcadorRenderizado: false };
   const ficha = fichas[0];
+  const pares = segmentosConcluidos(html);
+  const segmentos = elementos(renderizado, "div");
+  const limites = tags(renderizado, "template");
+  const ancestraisOcultos = segmentos.filter(segmento =>
+    segmento.inicio < ficha.inicio && segmento.fim > ficha.fim && /\shidden(?:\s|=|>)/.test(segmento.abertura));
+  if (!ancestraisOcultos.every(segmento => {
+    const id = atributo(segmento.abertura, "id");
+    return id && limites.some(limite => pares.get(atributo(limite.abertura, "id")) === id);
+  })) return { ficha: false, controles: false, marcadorRenderizado: false };
   const ids = tags(ficha.corpo, "input").map(tag => tag.abertura)
     .filter(tag => atributo(tag, "name") === "reivindicacaoId").map(tag => atributo(tag, "value"));
   exigir(ids.every(id => id === pedido), "pedido-pertence-a-uma-ficha");
   const formularios = elementos(ficha.corpo, "form").filter(formulario => pedidoNoFormulario(formulario, pedido));
   const controles = ["modo", "motivo"].every(nome => formularios.some(formulario =>
     tags(formulario.corpo, "input").some(tag => atributo(tag.abertura, "name") === nome)));
-  const pares = segmentosConcluidos(html);
-  const segmentos = elementos(renderizado, "div");
   let dados = ficha.corpo;
   for (const limite of tags(ficha.corpo, "template")) {
     const id = atributo(limite.abertura, "id");

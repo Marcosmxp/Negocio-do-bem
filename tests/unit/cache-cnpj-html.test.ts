@@ -141,6 +141,28 @@ describe("observador HTTP do cache de CNPJ por ficha", () => {
     expect(observar(html, "pedido-2").marcadorRenderizado).toBe(true);
   });
 
+  it("não aprova uma ficha dentro de um segmento ancestral oculto ainda não concluído", () => {
+    const html = `<div hidden id="S:1">${ficha("pedido-1", marcador)}</div>`;
+    expect(observar(html, "pedido-1")).toEqual({ ficha: false, controles: false, marcadorRenderizado: false });
+  });
+
+  it("aceita a ficha quando o segmento ancestral oculto tem limite e conclusão correspondentes", () => {
+    const html = '<template id="B:1"></template>' +
+      `<div hidden id="S:1">${ficha("pedido-1", marcador)}</div>` + '<script>$RC("B:1","S:1")</script>';
+    expect(observar(html, "pedido-1")).toEqual({ ficha: true, controles: true, marcadorRenderizado: true });
+  });
+
+  it("não aprova um ancestral oculto com chamada de conclusão mas sem limite correspondente", () => {
+    const html = `<div hidden id="S:1">${ficha("pedido-1", marcador)}</div>` + '<script>$RC("B:1","S:1")</script>';
+    expect(observar(html, "pedido-1")).toEqual({ ficha: false, controles: false, marcadorRenderizado: false });
+  });
+
+  it("não aprova a ficha se outro ancestral oculto continua sem conclusão", () => {
+    const html = '<template id="B:1"></template>' +
+      `<div hidden id="S:2"><div hidden id="S:1">${ficha("pedido-1", marcador)}</div></div>` + '<script>$RC("B:1","S:1")</script>';
+    expect(observar(html, "pedido-1")).toEqual({ ficha: false, controles: false, marcadorRenderizado: false });
+  });
+
   it("recusa uma ficha duplicada em vez de escolher arbitrariamente uma ocorrência", () => {
     const html = ficha("pedido-1", marcador) + ficha("pedido-1", marcador);
     expect(() => observar(html, "pedido-1")).toThrow(/ficha.*unica|ficha.*única/);
