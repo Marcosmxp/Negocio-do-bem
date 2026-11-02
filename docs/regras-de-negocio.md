@@ -1212,3 +1212,11 @@ Os [próximos passos do README](../README.md#próximos-passos-sugeridos) listam 
 - Moderadores podem suspender anúncios `publicado` com justificativa obrigatória, preservando a linha, o motivo e o registro de auditoria. Um anúncio suspenso não aparece no catálogo e só regressa após edição e nova aprovação.
 - A publicidade dos contatos do profissional continua sujeita à escolha de publicar o perfil. A área de atendimento inclui somente municípios/UF, nunca CEP ou endereço postal.
 - Os contratos futuros com endereços estruturados (#158/#168) e confirmação de donos (#133/#134, PRs #136/#137) devem ser alinhados antes de integrar as respectivas funcionalidades. Não duplicar cadastros nem expor dados privados.
+
+### Proteção contra decisões desatualizadas (#87)
+
+- Cada serviço guarda `versaoConteudo`, iniciado em 1 e incrementado ao salvar uma nova versão do anúncio ou quando informações públicas do perfil alteram a revisão pendente.
+- O formulário de moderação envia a versão que o moderador efetivamente visualizou. Aprovar, rejeitar e suspender usam uma condição atómica por `id`, `status` e `versaoConteudo`.
+- Se o prestador alterar o conteúdo antes da decisão, o formulário antigo é recusado e o moderador precisa consultar a versão atual. Uma transação isolada, sem comparar a versão, não seria suficiente.
+- A gestão de serviços fica em `/meus-servicos` e `/meus-servicos/[id]`. O caminho `/painel/[usuario]` permanece disponível para qualquer identificador válido de negócio, incluindo `servicos`.
+- O painel de serviços não dá acesso a contas que não sejam donas, e as operações mantêm validações de permissão na Server Action.
