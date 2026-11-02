@@ -21,7 +21,7 @@ As regras em si, uma por uma, estão em [Regras de negócio](regras-de-negocio.m
 
 ## 1. Por que o projeto existe
 
-O Negócio do Bem nasceu para dar visibilidade a quem cuida das pessoas, da comunidade e do planeta. A página [Como funciona](https://negociodobem.vercel.app/sobre) resume a ideia: quando negócios são atacados por defenderem o respeito e a dignidade, a melhor resposta é coletiva. A comunidade encontra, indica e fortalece quem faz o bem.
+O Negócio do Bem nasceu para dar visibilidade a quem cuida das pessoas, da comunidade e do planeta. A página [Como funciona](https://www.negociodobem.com/sobre) resume a ideia: quando negócios são atacados por defenderem o respeito e a dignidade, a melhor resposta é coletiva. A comunidade encontra, indica e fortalece quem faz o bem.
 
 Daí saem as três peças do produto:
 
@@ -33,12 +33,12 @@ Daí saem as três peças do produto:
 
 Quase toda regra do sistema sai de um destes princípios. Diante de uma decisão nova, comece por eles.
 
-### A comunidade indica, o dono confirma, a moderação garante
+### A comunidade indica, o dono assume, a moderação corrige depois
 
 O diretório cresce sem precisar que os donos se cadastrem primeiro: qualquer pessoa indica. Isso traz um risco, que é alguém se passar pelo dono ou cadastrar um perfil falso. A resposta tem três partes:
 
 - **A moderação corrige depois.** Indicações entram no ar na hora, e a moderação tira do ar o que for spam ou perfil falso. Até a [issue #20](https://github.com/fabs-reis/Negocio-do-bem/issues/20), cada indicação esperava a revisão, mas a fila cresceu mais rápido do que dava para revisar.
-- **O selo diz quem falou.** "Indicado pela comunidade" e "Verificado pelo dono" são selos diferentes, então quem visita sabe se o perfil foi confirmado.
+- **O selo informa se o perfil foi assumido.** "Indicado pela comunidade" e "Perfil assumido" são selos diferentes. Uma aprovação automática também recebe "Perfil assumido", sem afirmar que a moderação conferiu os dados. O selo não certifica identidade nem causas.
 - **Quem chega primeiro num negócio sem dono vira dono.** O pedido pelos dados do negócio é aprovado na hora quando ninguém assumiu o perfil. Disputas, quando o negócio já tem dono, continuam com a moderação.
 
 ### O @ do Instagram é a identidade do negócio
@@ -74,7 +74,7 @@ Assim, um depoimento negativo e honesto não some só porque incomodou o dono, e
 
 ### Sem ranking e sem anúncio pago
 
-A ordem do diretório é simples e transparente: verificados primeiro, depois os atualizados mais recentemente. Não existe nota, destaque pago nem algoritmo de relevância.
+A ordem do diretório é simples e transparente: perfis assumidos primeiro, depois os atualizados mais recentemente. Não existe nota, destaque pago nem algoritmo de relevância.
 
 ### Funcionar sem depender de terceiros
 
@@ -259,7 +259,7 @@ A cidade era digitada à mão, com o estado num seletor à parte. A mesma cidade
 A página inicial juntava apresentação, busca, filtros de causas e a lista de negócios, e achar um negócio era confuso. Três variações foram desenhadas num protótipo. A escolhida juntou a página inicial de uma com o diretório de outra.
 
 - **A página inicial ficou para começar:** o número de negócios cadastrados em destaque, a busca "O que você procura?" + "Onde?", atalhos e os tipos de negócio com seus totais.
-- **O diretório ganhou endereço próprio, `/explorar`.** Ele abre ao buscar ou ao escolher um tipo, com os filtros ao lado (tipo, causas, só verificados), grade ou lista e paginação numerada.
+- **O diretório ganhou endereço próprio, `/explorar`.** Ele abre ao buscar ou ao escolher um tipo, com os filtros ao lado (tipo, causas, só perfis assumidos), grade ou lista e paginação numerada.
 - **Os filtros são links, não um formulário.** Cada opção é um link para a URL com aquele filtro trocado (`mudarFiltro`, em `src/lib/diretorio.ts`). Assim funciona sem JavaScript e toda busca pode ser compartilhada. Só a ordenação usa um `<select>` com JavaScript.
 - **Cada opção mostra quantos negócios aparecem ao marcá-la.** São poucas consultas por página: um `groupBy` por categoria ignorando os tipos marcados, e um `groupBy` das causas entre os resultados.
 - **O "Onde?" sugere só lugares com negócios** (`listarCidades`). A lista é pequena e vai pronta para o navegador. O texto escolhido ("Recife, PE") vai na URL e o servidor o interpreta, então digitar à mão também funciona.
@@ -500,6 +500,13 @@ O convite do rodapé só aparecia em alguns navegadores, e o manual em PDF não 
 - **Sem prints das telas do sistema.** Os botões do Chrome e do Safari aparecem desenhados no meio do texto. Prints do iOS e do Android mudam a cada versão e envelheceriam a página.
 - **O rodapé leva sempre a `/instalacao`,** em qualquer navegador, e o link sai no HTML do servidor, para os buscadores acharem a página. Ele virou um botão laranja com ícone de download, logo abaixo da descrição do site: no celular, é a primeira coisa do rodapé. O botão que abre direto a janela do Chrome ficou no passo a passo do Android e no cartão do painel.
 
+### 1º de novembro: o Analytics volta à produção ([#243](https://github.com/fabs-reis/Negocio-do-bem/issues/243))
+
+Desde a mudança para o Cloudflare, em 31/10, o site não carregava o Google Analytics. As visitas registradas caíram de quase 5 mil por dia para algumas dezenas, e os eventos da #203 nunca chegaram.
+
+- **A variável era lida no build.** O `NEXT_PUBLIC_GA_ID` estava só na Vercel. O Next põe as variáveis `NEXT_PUBLIC_` no código durante o build, e a casca estática do layout também é gerada ali. No Cloudflare, ela precisa estar nas variáveis de build da produção (Workers Builds), e não nas de runtime do Worker.
+- **Os previews continuam sem Analytics.** As variáveis de build dos previews ficam em outra aba do painel, sem o ID.
+
 ---
 
 ## 4. Arquitetura
@@ -723,6 +730,9 @@ npm run typecheck
   - A suíte se recusa a rodar se o nome do banco não tiver "test", para nunca apagar dados de desenvolvimento.
 - **No GitHub,** o CI roda lint, tipos e testes num Postgres temporário em todo PR e a cada push na `stage` e na `main`.
   - Dois workflows avisam sem bloquear o merge: a **auditoria de dependências** (`npm audit`, em todo PR e todo dia sobre a `stage`) e o **CodeQL** (análise estática do código, em todo PR, a cada push e toda segunda). Os alertas do CodeQL ficam na aba Security.
+  - A auditoria só falha com vulnerabilidade alta ou crítica (`--audit-level=high`).
+    - Os `overrides` do `package.json` levam ao `glob` 14 o `@opennextjs/cloudflare` (que pede o 13) e o `@node-minify/core`, que entra pelo `@opennextjs/aws` e fixa o 10.3.3. Os dois tinham avisos de segurança que o OpenNext ainda não corrigiu, e só chamam `glob()` e `globSync()`, que não mudaram no 14. Quando o OpenNext pedir um `glob` corrigido, tire os overrides.
+    - Fica uma exceção conhecida: o `minimatch` do ESLint e dos plugins dele ([GHSA-g3hv-75wg-m249](https://github.com/advisories/GHSA-g3hv-75wg-m249), moderada). A correção só existe no `minimatch` 11, que não pode mais ser chamado como função, e os plugins do ESLint chamam o 3 assim. Ele só roda no lint, com padrões do próprio repositório. Some quando o ESLint e os plugins subirem o `minimatch`.
   - O **Dependabot** abre PRs para a `stage` toda segunda com as versões novas do npm e das Actions, só depois de alguns dias publicadas (`.github/dependabot.yml`). As Actions ficam presas pelo SHA do commit.
 
 **A regra do projeto:** mudou uma regra em `src/lib/reivindicacao.ts`, atualize ou crie o teste em `tests/db/`. Para outras regras de `src/lib/`, um teste em `tests/unit/` é muito bem-vindo.
@@ -738,7 +748,7 @@ npm run typecheck
 | Banco dos previews | Projeto Neon separado (da integração do Vercel) | Não compartilha credenciais de produção. Configure em Worker Previews. |
 | Domínio | `www.negociodobem.com` como domínio personalizado do Worker | O domínio sem `www` passa pelo proxy do Cloudflare e uma regra de redirecionamento da zona manda para o `www` (301, com caminho e consulta). |
 | Fotos | Cloudflare R2 | Bucket privado para cache; bucket de uploads servido por domínio próprio em produção. Em POC, pode usar a Public Development URL (`r2.dev`), que expõe os objetos publicamente e tem limite de requisições. Configure buckets separados para produção e previews. |
-| Medição | Google Analytics 4 | `NEXT_PUBLIC_GA_ID` só em Production. |
+| Medição | Google Analytics 4 | `NEXT_PUBLIC_GA_ID` só nas variáveis de build da produção. |
 | Fotos do Instagram | Script local (launchd) + app "Negócio do Bem" na Meta | `FOTOS_TOKEN` no Worker de produção; o resto fica no `.env.fotos` do computador que roda a rotina. |
 | Avisos por e-mail | Resend, com o domínio `negociodobem.com` | `RESEND_API_KEY` e `EMAIL_REMETENTE` só em Production. O DNS do domínio fica na Hostinger, e a caixa `ola@negociodobem.com`, que recebe as respostas, no Zoho Mail. |
 
@@ -768,7 +778,7 @@ npm run typecheck
 | `PREVIEW_DATABASE_URL`, `PREVIEW_DATABASE_URL_UNPOOLED`, `PREVIEW_APP_URL`, `PREVIEW_R2_PUBLIC_URL` | No build dos previews | Variáveis de build que o `cloudflare-build.sh` usa nas branches que não são a `main`, no lugar das de produção. |
 | `NEXT_PUBLIC_R2_PUBLIC_URL` | Sim em deploy | Origem HTTPS pública do bucket de uploads R2 (domínio próprio em produção; `r2.dev` pode ser usado em POC/previews). Configure também durante o build. |
 | `CLOUDFLARE_DEPLOY` | No `wrangler.jsonc` | Com `1`, permite usar o cabeçalho `cf-connecting-ip`, inserido pelo Cloudflare, para limitar tentativas por IP. |
-| `NEXT_PUBLIC_GA_ID` | Não | Google Analytics. Configure só em Production. |
+| `NEXT_PUBLIC_GA_ID` | Não | Google Analytics. Configure só nas variáveis de build da produção, no Workers Builds: o Next põe o valor no código durante o build. Só como variável de runtime, o script do Analytics não entra nas páginas. |
 | `GOOGLE_SITE_VERIFICATION`, `BING_SITE_VERIFICATION` | Não | Meta tags de verificação do Google Search Console e do Bing Webmaster Tools. Configure só em Production. |
 | `FOTOS_TOKEN` | Não | Liga a rota da rotina de fotos do Instagram. No mínimo 32 caracteres. |
 | `INSTAGRAM_PERFIL_OFICIAL` | Não | O @ do projeto no Instagram, que vai nos dados estruturados da página inicial. |
@@ -980,6 +990,7 @@ O PR só conflita se a `main` recebeu algo que não passou pela `stage`. Nesse c
 - **Filtros no endereço multiplicam as páginas para os robôs.** Uma página nova que monta links com filtros no endereço (`?tipo=...&causa=...`) precisa entrar no `disallow` do `src/app/robots.ts`, como o `/explorar?`. Sem isso, um robô abre cada combinação e cada uma consulta o banco ([#141](https://github.com/fabs-reis/Negocio-do-bem/issues/141)).
 - **Status 200 não quer dizer que a página abriu.** Com o Cache Components, a página chega com status 200 e o erro do banco vem dentro do conteúdo. Para saber se o site está no ar, confira se a lista de negócios aparece, e não só o status.
 - **O log do Worker perde a mensagem de um erro passado como objeto.** `console.error("Falhou:", erro)` aparece no Observability só com a pilha, sem a mensagem. Escreva a mensagem no texto: `` console.error(`Falhou: ${erro.message}`) `` ([#198](https://github.com/fabs-reis/Negocio-do-bem/issues/198)). Para achar a função de uma linha da pilha (`worker.js:100013`), abra "Editar código" no painel do Worker e vá até a linha, sem implantar nada.
+- **O `glob` do `@node-minify/core` é forçado para a 10.5.0 pelo `overrides` do `package.json`.** O `@opennextjs/aws` usa o `@node-minify/core` 9, que fixa o `glob` 10.3.3, e ele deixava o `npm audit` com aviso alto em todo PR ([#217](https://github.com/fabs-reis/Negocio-do-bem/issues/217)): a falha da linha de comando do `glob` ([GHSA-5j98](https://github.com/advisories/GHSA-5j98-mcp5-4vw2)), que o projeto nem usa. A 10.5.0 é a mesma versão grande, publicada em 11/2025, e corrige o aviso. O override vale só dentro do `@node-minify/core`, para não alcançar dependências novas que tragam o `glob`. Ficam avisos moderados: o [GHSA-3g3m](https://github.com/advisories/GHSA-3g3m-2fjr-6pw4), corrigido só no `glob` 14.0.2, publicado em 28/10/2026 (dentro da quarentena de 30 dias do `dependabot.yml`), e o `minimatch` antigo que vem com o ESLint: forçar a versão 11 quebra o `eslint-plugin-react`, o `eslint-plugin-import` e o `eslint-plugin-jsx-a11y`, que chamam `require("minimatch")` como função. Para saber se o override ainda faz falta, tire-o e rode `npm install` e `npm audit --audit-level=high`.
 
 ---
 
