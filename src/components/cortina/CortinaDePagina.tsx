@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, type TransitionEvent } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { destinoDaBusca, proximaFaseCortina, type DestinoCortina, type EventoCortina, type FaseCortina } from "@/lib/cortina";
+import { destinoDaBusca, enderecoNormalizado, proximaFaseCortina, type DestinoCortina, type EventoCortina, type FaseCortina } from "@/lib/cortina";
 import "./cortina.css";
 
 type Navegacao = DestinoCortina & { origem: string; enviada: boolean };
@@ -58,7 +58,7 @@ export function CortinaDePagina() {
       // navegaria antes de a cortina cobrir. A cortina assume esta navegação.
       evento.stopPropagation();
       if (pendente.current) return;
-      pendente.current = { ...destino, origem: `${location.pathname}${location.search}`, enviada: false };
+      pendente.current = { ...destino, origem: enderecoNormalizado(location.pathname, location.search), enviada: false };
       mudar("iniciar");
       // Se o roteador ou um evento de transição falhar, a tela nunca prende a pessoa.
       seguranca.current = setTimeout(seguirSemCortina, 3200);
@@ -88,7 +88,7 @@ export function CortinaDePagina() {
   useEffect(() => {
     const navegacao = pendente.current;
     // A busca no próprio Explorar só muda os parâmetros, então o endereço inteiro conta.
-    const endereco = `${caminho}${parametros ? `?${parametros}` : ""}`;
+    const endereco = enderecoNormalizado(caminho, parametros);
     if (!navegacao?.enviada || !caminho || endereco === navegacao.origem) return;
     const quadro = requestAnimationFrame(() => {
       if (pendente.current === navegacao) mudar("revelar");

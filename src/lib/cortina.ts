@@ -27,7 +27,13 @@ export function destinoDaBusca(busca: BuscaDaCortina): DestinoCortina | null {
   if (!/^https?:$/.test(destino.protocol) || destino.origin !== atual.origin) return null;
   destino.search = new URLSearchParams(busca.campos).toString();
   const href = `${destino.pathname}${destino.search}`;
-  return href === `${atual.pathname}${atual.search}` ? null : { href };
+  return href === enderecoNormalizado(atual.pathname, atual.search) ? null : { href };
+}
+
+/** Caminho e parâmetros com a mesma codificação de `URLSearchParams` (ex.: `%20` vira `+`). */
+export function enderecoNormalizado(caminho: string, parametros: string): string {
+  const busca = new URLSearchParams(parametros).toString();
+  return `${caminho}${busca ? `?${busca}` : ""}`;
 }
 
 export function proximaFaseCortina(fase: FaseCortina, evento: EventoCortina): FaseCortina {

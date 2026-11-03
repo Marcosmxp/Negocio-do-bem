@@ -23,6 +23,10 @@ describe("destinoDaBusca", () => {
     expect(destino).toEqual({ href: "/explorar?q=bolo" });
   });
 
+  it("reconhece a mesma busca mesmo com outra codificação na barra de endereço", () => {
+    expect(destinoDaBusca(busca({ atual: "https://exemplo.com/explorar?q=a%20b", campos: [["q", "a b"]] }))).toBeNull();
+  });
+
   it.each([
     { atual: "https://exemplo.com/explorar?q=padaria&onde=recife-pe" },
     { acao: "https://outro.com/explorar" },
