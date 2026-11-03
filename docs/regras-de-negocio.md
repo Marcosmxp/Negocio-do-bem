@@ -1320,6 +1320,7 @@ Embaixadores são pessoas, em geral influenciadores, que levam o projeto para um
 - Localizações inválidas não removem silenciosamente o filtro: o catálogo mostra aviso e zero resultados. O mesmo filtro de visibilidade é usado em `count` e `findMany`.
 - Alterar o perfil profissional retira os anúncios publicados para nova análise quando muda informação pública, sem deixar a cidade antiga nas colunas de origem. O campo textual de busca de serviços indexa o conteúdo do anúncio, não a cidade de origem do prestador.
 - Moderadores podem suspender anúncios `publicado` com justificativa obrigatória, preservando a linha, o motivo e o registro de auditoria. Um anúncio suspenso não aparece no catálogo e só regressa após edição e nova aprovação.
+- Recusas e suspensões guardam a justificação também em `RegistroAuditoria.detalhes`, na mesma transação da decisão. O reenvio limpa os motivos do anúncio atual, mas não apaga a justificação histórica.
 - A publicidade dos contatos do profissional continua sujeita à escolha de publicar o perfil. A área de atendimento inclui somente municípios/UF, nunca CEP ou endereço postal.
 - Os contratos futuros com endereços estruturados (#158/#168) e confirmação de donos (#133/#134, PRs #136/#137) devem ser alinhados antes de integrar as respectivas funcionalidades. Não duplicar cadastros nem expor dados privados.
 

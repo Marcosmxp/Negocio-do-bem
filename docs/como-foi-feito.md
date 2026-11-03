@@ -1075,3 +1075,4 @@ Pedidos de orçamento, denúncias, contratos, avaliações, histórico de servi�
 - O painel de serviços foi movido para `/meus-servicos`, sem reservar identificadores do Instagram válidos sob `/painel/[usuario]`.
 - Os testes das actions reais cobrem alterações de anúncio/perfil durante a análise, aprovações concorrentes, propriedade e colisão de rotas.
 - Os alvos de auditoria passaram a resolver serviços e perfis profissionais, preservando o histórico de decisões.
+- Os motivos de rejeição e suspensão ficam guardados como texto legível em `RegistroAuditoria.detalhes`, dentro da transação de moderação; testes pelas Server Actions comprovam que o reenvio não os elimina.
