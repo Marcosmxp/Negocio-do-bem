@@ -127,6 +127,41 @@ describe("ações reais de serviços e decisões de moderação", () => {
     expect((await db.servico.findUniqueOrThrow({ where: { id: anuncioId } })).status).toBe("publicado");
   });
 
+  it("guarda a justificativa de rejeição mesmo após o reenvio", async () => {
+    const motivo = "O anúncio precisa esclarecer os serviços oferecidos.";
+    const versao = (await db.servico.findUniqueOrThrow({ where: { id: anuncioId } })).versaoConteudo;
+    await redireciona(() => moderarServico(dados({
+      id: anuncioId, versaoConteudo: String(versao), decisao: "rejeitar", motivo,
+    })), "/moderacao/servicos?aviso=feito");
+    await redireciona(() => salvarServico(undefined, edicaoServico(anuncioId, "Anúncio com dados corrigidos")), "/meus-servicos?aviso=servico_enviado");
+
+    const anuncio = await db.servico.findUniqueOrThrow({ where: { id: anuncioId } });
+    expect(anuncio.status).toBe("pendente");
+    expect(anuncio.motivoRecusa).toBeNull();
+    const evento = await db.registroAuditoria.findFirstOrThrow({
+      where: { alvoTipo: "servico", alvoId: anuncioId, acao: "servico.rejeitado" },
+    });
+    expect(JSON.parse(evento.detalhes ?? "{}")).toEqual({ motivo });
+  });
+
+  it("guarda a justificativa de suspensão mesmo após o reenvio", async () => {
+    const motivo = "O anúncio foi suspenso por informações incorretas.";
+    const versao = (await db.servico.findUniqueOrThrow({ where: { id: anuncioId } })).versaoConteudo;
+    await redireciona(() => moderarServico(decisao(anuncioId, versao)), "/moderacao/servicos?aviso=feito");
+    await redireciona(() => moderarServico(dados({
+      id: anuncioId, versaoConteudo: String(versao), decisao: "suspender", motivo,
+    })), "/moderacao/servicos?aviso=feito");
+    await redireciona(() => salvarServico(undefined, edicaoServico(anuncioId, "Anúncio corrigido após suspensão")), "/meus-servicos?aviso=servico_enviado");
+
+    const anuncio = await db.servico.findUniqueOrThrow({ where: { id: anuncioId } });
+    expect(anuncio.status).toBe("pendente");
+    expect(anuncio.motivoSuspensao).toBeNull();
+    const evento = await db.registroAuditoria.findFirstOrThrow({
+      where: { alvoTipo: "servico", alvoId: anuncioId, acao: "servico.suspenso" },
+    });
+    expect(JSON.parse(evento.detalhes ?? "{}")).toEqual({ motivo });
+  });
+
   it("impede a edição do anúncio por outra conta", async () => {
     const outra = await db.usuario.create({
       data: { nome: "Terceira pessoa", email: "terceiro-" + randomUUID() + "@example.com", senhaHash: "x" },
