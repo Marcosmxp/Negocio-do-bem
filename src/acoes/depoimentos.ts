@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { after } from "next/server";
 import { z } from "zod";
 import { exigirUsuario } from "@/lib/auth/sessao";
+import { MENSAGEM_CONTENCAO, reservarEscrita } from "@/lib/antiabuso";
 import { AVISOS } from "@/lib/avisos";
 import { db } from "@/lib/db";
 import { texto, valoresDoFormulario, type EstadoFormulario } from "@/lib/formulario";
@@ -42,6 +43,10 @@ export async function publicarDepoimento(_estado: EstadoFormulario, dados: FormD
   });
   if (jaEscreveu) return { erro: "Você já deixou um depoimento para este negócio. Obrigado!" };
 
+  if (!(await reservarEscrita({ operacao: "depoimento", usuarioId: usuario.id, negocioId: empresa.id }))) {
+    return { erro: MENSAGEM_CONTENCAO, valores: valoresDoFormulario(dados) };
+  }
+
   const depoimento = await db.depoimento.create({ data: { empresaId: empresa.id, autorId: usuario.id, texto: resultado.data } });
   after(() => avisarNovoDepoimento(depoimento.id));
   await medir({ nome: "depoimento_publicado", params: { categoria: empresa.categoria } });
@@ -78,6 +83,10 @@ export async function denunciarDepoimento(dados: FormData): Promise<void> {
   // A página esconde o botão para o autor; a regra vale aqui também.
   if (depoimento.autorId === usuario.id) redirect(`${voltar}#depoimentos`);
   if (!usuario.emailConfirmado) redirect(`${voltar}?aviso=confirmar_email#depoimentos`);
+
+  if (!(await reservarEscrita({ operacao: "denuncia", usuarioId: usuario.id, negocioId: depoimento.empresaId }))) {
+    redirect(`${voltar}?aviso=limite_operacoes#depoimentos`);
+  }
 
   // A condição `denunciado: false` fica no próprio UPDATE: com dois envios ao
   // mesmo tempo, só o primeiro grava e só ele avisa a moderação.

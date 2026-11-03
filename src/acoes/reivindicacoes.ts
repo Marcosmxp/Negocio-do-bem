@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { after } from "next/server";
 import { z } from "zod";
 import { exigirUsuario } from "@/lib/auth/sessao";
+import { MENSAGEM_CONTENCAO, reservarEscrita } from "@/lib/antiabuso";
 import { AVISOS } from "@/lib/avisos";
 import { cnpjValido, limparCnpj } from "@/lib/cnpj";
 import { db } from "@/lib/db";
@@ -49,6 +50,10 @@ export async function enviarDocumento(_estado: EstadoFormulario, dados: FormData
     mensagem: texto(dados, "mensagem"),
   });
   if (!resultado.success) return { erros: errosPorCampo(resultado.error), valores: valoresDoFormulario(dados) };
+
+  if (!(await reservarEscrita({ operacao: "reivindicacao", usuarioId: usuario.id, negocioId: empresa.id }))) {
+    return { erro: MENSAGEM_CONTENCAO, valores: valoresDoFormulario(dados) };
+  }
 
   let aprovada: boolean;
   try {

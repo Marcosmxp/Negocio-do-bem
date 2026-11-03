@@ -1020,3 +1020,11 @@ E dois combinados que mantêm esta documentação útil:
 
 - **Mudou uma regra de negócio?** Atualize o [Regras de negócio](regras-de-negocio.md) no mesmo PR.
 - **Tomou uma decisão que muda o rumo do projeto?** Conte o porquê na descrição do PR e, se for uma decisão de fundo, aqui neste guia.
+
+
+## Issue #104 — Primeira camada de proteção contra escrita automatizada
+
+- `src/lib/antiabuso.ts` partilha o armazenamento de contadores PostgreSQL de `TentativaAcesso`, sem nova dependência nem leitura de IP não confiável.
+- A reserva atómica acontece antes da criação de conteúdo nas Server Actions de depoimentos, denúncia, indicação e reivindicação por documento. A janela é limitada e os contadores antigos são eliminados de forma amostrada.
+- Testes de banco exercitam concorrência, isolamento entre contas e isolamento de tipos de operação; os limites de login da issue #36 continuam separados.
+- **Não encerrar a #104 apenas com esta entrega.** A suspensão administrativa reversível, o modo de contenção temporário e a proteção da leitura pública exigem fases próprias, além de verificação das configurações reais de WAF e de custo.

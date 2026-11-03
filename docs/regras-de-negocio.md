@@ -1296,3 +1296,12 @@ Embaixadores são pessoas, em geral influenciadores, que levam o projeto para um
 - A moderação envia, troca ou remove, como a foto do negócio.
 - Um embaixador sem foto ganha a do Instagram na próxima consulta, como "Sistema" na auditoria (`embaixador.foto_do_instagram`). A foto enviada pela moderação nunca é trocada.
 - Sem foto nenhuma, aparecem as iniciais.
+
+
+## Segurança — primeira etapa da contenção de abuso (#104)
+
+- Escritas de depoimentos, denúncias, indicações e pedidos por documento recebem orçamentos de tentativas por conta e, quando aplicável, por negócio e origem confiável.
+- O contador é atómico no PostgreSQL usando a tabela existente `TentativaAcesso`: pedidos concorrentes não ultrapassam o mesmo limite por janela.
+- Dados de origem são normalizados apenas a partir de cabeçalhos reescritos pela infraestrutura de confiança. Sem origem fiável, a proteção por conta permanece; não se bloqueia toda a comunidade sob uma chave de IP desconhecido.
+- O excesso produz um erro controlado e reversível após a janela. Denúncias não retiram conteúdos do ar automaticamente e a moderação continua responsável pelas decisões.
+- Isto não substitui a verificação de e-mail (#179), suspensão de contas, contenção global de escrita ou as regras de borda do Cloudflare (#183). Os limiares operacionais e regras privadas de deteção não são publicados na documentação.

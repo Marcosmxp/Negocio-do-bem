@@ -3,6 +3,10 @@ import type { TipoAviso } from "@/components/Aviso";
 // Mensagens mostradas depois de um redirecionamento (?aviso=codigo).
 // Só códigos conhecidos viram texto: nada da URL é exibido diretamente.
 export const AVISOS: Record<string, { tipo: TipoAviso; texto: string }> = {
+  limite_operacoes: {
+    tipo: "erro",
+    texto: "Muitas operações em pouco tempo. Aguarde alguns minutos e tente novamente.",
+  },
   indicada: {
     tipo: "sucesso",
     texto: "Obrigado por indicar! O perfil já está no diretório.",

@@ -5,6 +5,7 @@ import { after } from "next/server";
 import { z } from "zod";
 import { apagarFoto, conferirFoto, guardarFoto } from "@/lib/armazenamento";
 import { registrarAuditoria } from "@/lib/auditoria";
+import { MENSAGEM_CONTENCAO, reservarEscrita } from "@/lib/antiabuso";
 import { caminhoSeguro, exigirUsuario } from "@/lib/auth/sessao";
 import { AVISOS } from "@/lib/avisos";
 import { filtrarCausas } from "@/lib/causas";
@@ -121,6 +122,9 @@ export async function indicarEmpresa(_estado: EstadoFormulario, dados: FormData)
     if (existente) {
       return { erros: { instagram: `@${instagram} já está no Negócio do Bem.` }, existente: instagram, valores };
     }
+  }
+  if (!(await reservarEscrita({ operacao: "indicacao", usuarioId: usuario.id }))) {
+    return { erro: MENSAGEM_CONTENCAO, valores };
   }
   const endereco = instagram ?? (await enderecoParaNegocioSemInstagram(campos.nome, campos.cidade));
 
