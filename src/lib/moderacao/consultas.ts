@@ -250,11 +250,12 @@ export type AlvoDoRegistro = { rotulo: string; href: string };
 async function comAlvos<T extends { alvoTipo: string; alvoId: string }>(registros: T[]) {
   const ids = (tipo: Alvo["tipo"]) => [...new Set(registros.filter((r) => r.alvoTipo === tipo).map((r) => r.alvoId))];
   const empresa = { select: { nome: true, instagramUsername: true } } as const;
-  const [empresas, usuarios, depoimentos, reivindicacoes, servicos, perfis] = await Promise.all([
+  const [empresas, usuarios, depoimentos, reivindicacoes, embaixadores, servicos, perfis] = await Promise.all([
     db.empresa.findMany({ where: { id: { in: ids("empresa") } }, select: { id: true, nome: true, instagramUsername: true } }),
     db.usuario.findMany({ where: { id: { in: ids("usuario") } }, select: { id: true, nome: true } }),
     db.depoimento.findMany({ where: { id: { in: ids("depoimento") } }, select: { id: true, autor: { select: { nome: true } }, empresa } }),
     db.reivindicacao.findMany({ where: { id: { in: ids("reivindicacao") } }, select: { id: true, empresa } }),
+    db.embaixador.findMany({ where: { id: { in: ids("embaixador") } }, select: { id: true, nome: true } }),
     db.servico.findMany({ where: { id: { in: ids("servico") } }, select: { id: true, titulo: true } }),
     db.perfilProfissional.findMany({ where: { usuarioId: { in: ids("perfilProfissional") } }, select: { usuarioId: true, nomePublico: true } }),
   ]);
@@ -270,12 +271,9 @@ async function comAlvos<T extends { alvoTipo: string; alvoId: string }>(registro
   for (const r of reivindicacoes) {
     alvos.set(`reivindicacao:${r.id}`, { rotulo: `Pedido para ${r.empresa.nome}`, href: `/moderacao/negocios/${r.empresa.instagramUsername}` });
   }
-  for (const servico of servicos) {
-    alvos.set(`servico:${servico.id}`, { rotulo: `Serviço: ${servico.titulo}`, href: "/moderacao/servicos" });
-  }
-  for (const perfil of perfis) {
-    alvos.set(`perfilProfissional:${perfil.usuarioId}`, { rotulo: `Perfil profissional: ${perfil.nomePublico}`, href: `/moderacao/contas/${perfil.usuarioId}` });
-  }
+  for (const e of embaixadores) alvos.set(`embaixador:${e.id}`, { rotulo: e.nome, href: `/moderacao/embaixadores/${e.id}` });
+  for (const servico of servicos) alvos.set(`servico:${servico.id}`, { rotulo: `Serviço: ${servico.titulo}`, href: "/moderacao/servicos" });
+  for (const perfil of perfis) alvos.set(`perfilProfissional:${perfil.usuarioId}`, { rotulo: `Perfil profissional: ${perfil.nomePublico}`, href: `/moderacao/contas/${perfil.usuarioId}` });
   return registros.map((r) => ({ ...r, alvo: alvos.get(`${r.alvoTipo}:${r.alvoId}`) ?? null }));
 }
 

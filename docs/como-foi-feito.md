@@ -507,6 +507,38 @@ Desde a mudança para o Cloudflare, em 31/10, o site não carregava o Google Ana
 - **A variável era lida no build.** O `NEXT_PUBLIC_GA_ID` estava só na Vercel. O Next põe as variáveis `NEXT_PUBLIC_` no código durante o build, e a casca estática do layout também é gerada ali. No Cloudflare, ela precisa estar nas variáveis de build da produção (Workers Builds), e não nas de runtime do Worker.
 - **Os previews continuam sem Analytics.** As variáveis de build dos previews ficam em outra aba do painel, sem o ID.
 
+### 2 de novembro: embaixadores do bem ([#250](https://github.com/fabs-reis/Negocio-do-bem/issues/250))
+
+Influenciadores que levam o projeto para a cidade ou o estado deles ganharam uma faixa na página inicial, a página `/embaixadores` e um bloco na página da cidade. O visual foi combinado num canvas antes do código. As regras estão em [Embaixadores do bem](regras-de-negocio.md#19-embaixadores-do-bem).
+
+- **A faixa passa sozinha.** A primeira versão rolava para o lado com o dedo ou o mouse, mas a barra de rolagem escondia quem estava fora da tela. O loop tem o botão "Pausar" e para com o mouse e o foco do teclado, porque um conteúdo que se mexe por mais de 5 segundos precisa de um jeito de parar. Para quem pede menos movimento, fica parada.
+- **Os seguidores vêm do próprio site, e não da rotina de fotos do Mac.** A prévia do cadastro já consulta a API da Meta pelo Worker. Os seguidores vêm na mesma consulta, uma vez por dia, depois de uma visita à página inicial ou a `/embaixadores`. Assim o número não depende de um computador ligado, e o limite da Meta fica longe.
+- **Arredondado para baixo.** "48,2 mil" nunca é mais do que a pessoa tem.
+- **Os seguidores aparecem, mas não ordenam.** A ordem é a que a moderação escolhe, e o número é o do Instagram, não uma nota do site: o princípio de [sem ranking](#sem-ranking-e-sem-anúncio-pago) continua valendo para os negócios.
+- **Embaixador não é conta do site.** Só a moderação cadastra, e quem cobre o estado inteiro aparece em todas as cidades dele. Ligar o embaixador a uma conta, para mostrar quantos negócios ele indicou, ficou para depois.
+
+### 3 de novembro: a página de cada embaixador ([#259](https://github.com/fabs-reis/Negocio-do-bem/issues/259))
+
+Faltava um link de cada embaixador para divulgar no Instagram, na bio e nos stories. O nome e o @ levavam direto ao Instagram, e o site não tinha uma página que fosse da pessoa. Agora `/embaixadores/<@>` mostra quem é, o "Sobre" e os negócios da região, e a faixa, os cartões e a página da cidade levam para lá.
+
+- **O endereço é o @.** Quem divulga já conhece o próprio @, e o link fica igual ao do Instagram: `negociodobem.com/embaixadores/alodiario_literario`.
+- **A página reaproveita a da cidade.** O `Vitrine` já tinha a introdução, a capa ao lado e a lista de negócios com os atalhos. A capa virou o perfil do Instagram, e o `Vitrine` ganhou só o título da lista ("Negócios do bem em Curitiba, PR").
+- **O "Sobre" começa com a bio, mas é da moderação.** A bio vem na mesma consulta à Meta dos seguidores (`biography`) e só entra num "Sobre" vazio, quando a moderação cadastra ou clica em "Atualizar pelo Instagram agora". A consulta do dia nunca mexe nele: o texto ajustado pela moderação não volta a ser a bio.
+- **O Instagram ficou num botão só,** "Seguir no Instagram", na página do embaixador. Os outros links ficam dentro do site, onde estão os negócios.
+- **A prévia do link é própria,** com a foto e o nome, porque é ela que aparece quando o link é colado no Instagram ou no WhatsApp.
+
+### 3 de novembro: o perfil do negócio ganha capa e duas colunas ([#260](https://github.com/fabs-reis/Negocio-do-bem/issues/260))
+
+O perfil só contava quem é o negócio, em texto simples e com os botões todos iguais. A página passou a ajudar a pessoa a decidir ir ao local e a voltar, **sem migração**: usa só dados que já existem.
+
+- **Capa:** o negócio só tem a foto de perfil, então a capa é a foto da cidade (com o crédito do Commons) ou, sem ela, um banner da marca. Um mosaico de fotos do negócio exigiria uma tabela e um envio novos, e ficou para depois.
+- **Topo com ação:** o botão principal é o WhatsApp (ou o Instagram, sem WhatsApp) e há "Compartilhar", que copia o link.
+- **Duas colunas no computador:** história e depoimentos à esquerda; o cartão de contato fica fixo à direita.
+- **Causas por grupo,** os mesmos do filtro do diretório, em vez de uma fila de selos iguais.
+- **Depoimentos antes do formulário,** com um botão para o dono copiar o link e pedir depoimentos.
+- **Negócios parecidos** da mesma cidade no fim da página (`negociosParecidos`).
+- **O que está vazio some:** nenhum bloco em branco para o visitante.
+
 ---
 
 ## 4. Arquitetura
@@ -604,6 +636,7 @@ Decisões do esquema:
 - **As causas ficam no código** (`src/lib/causas.ts`), e o banco guarda só o slug. Criar uma causa é mudar uma linha, sem migração.
 - **Unicidade garantida pelo banco:**
   - um @ por negócio;
+  - um @ por embaixador;
   - uma conta do Google por conta do site (`googleId`);
   - um ID de conta do Instagram por negócio;
   - um depoimento por pessoa por negócio;
@@ -631,7 +664,7 @@ Cada formulário chama uma função em `src/acoes/`, sempre na mesma ordem:
    Nunca confie em um botão escondido: a conferência é sempre no servidor.
 2. **Valida os dados com Zod.** Os campos reaproveitáveis (`campoSite`, `campoWhatsapp`, `campoEmail`) estão em `src/lib/formulario.ts`.
 3. **Faz a mudança no banco.** Use uma transação quando mais de uma tabela muda junto.
-4. **Registra na auditoria** se for uma decisão ou edição importante.
+4. **Registra na auditoria** se for uma decisão ou edição importante, dentro da mesma transação da alteração no banco. Use `registrarAuditoria(tx, ...)`, para uma falha no registro também desfazer a alteração.
 5. **Redireciona com um aviso:** `?aviso=codigo`, com o texto em `src/lib/avisos.ts`.
 
 Quando há erro de validação, a ação devolve um `EstadoFormulario` com os erros por campo e os valores enviados. Assim o formulário mostra o erro sem perder o que a pessoa digitou.
@@ -702,7 +735,15 @@ npm run typecheck
 - **O banco de teste é separado** (`negocio_do_bem_teste`, ou o de `TEST_DATABASE_URL`).
   - Ele é criado na primeira execução e as tabelas são limpas entre os testes.
   - A suíte se recusa a rodar se o nome do banco não tiver "test", para nunca apagar dados de desenvolvimento.
-- **No GitHub,** o CI roda lint, tipos e testes num Postgres temporário em todo PR e a cada push na `stage` e na `main`.
+- **No GitHub,** o CI roda lint, tipos, testes, build de produção e integração num Postgres temporário em todo PR e a cada push na `stage` e na `main`.
+- **`npm run test:integracao`:** depois de `npm run build`, inicia o Next real em uma porta local. Usa contas e sessões fictícias no banco de teste para verificar a moderação compilada. Cada Server Action de `src/acoes/moderacao.ts` é enviada como visitante e como membro e precisa terminar em `/404` sem gravar nada. As três páginas exclusivas da moderação (a fila e as duas de detalhe) são abertas pelos mesmos papéis e pela moderação, que serve de controle. Uma ação nova em `src/acoes/moderacao.ts` faz a prova falhar até ser incluída na lista do teste. O servidor encerra ao terminar, e apenas os dados criados pela prova são removidos. Qualquer erro escrito pelo servidor faz a prova falhar, com o caminho do log completo, que fica na pasta temporária do sistema.
+- A configuração comum descobre apenas `tests/unit/` e `tests/db/`. A integração tem configuração própria, não depende de variável de ativação e falha se não encontrar testes. Ela não cria rota de teste no produto nem depende de um navegador ou de um serviço externo.
+- The test setup removes inherited Blob selectors and the public R2 URL. Unit tests enable external storage only with a replacement SDK. The HTTP proof does not upload photos. In CI, Next uses the disposable PostgreSQL database that the database tests prepare.
+- **`npm run test:cloudflare`:** runs a separate Cloudflare proof. Set `TEST_DATABASE_URL` to a disposable PostgreSQL server at `127.0.0.1`. Include an explicit port, user, password, and database name that contains `test`. Do not include query parameters or a fragment. The account must have permission to create databases.
+- The command creates a separate database with a random name. It runs preview migrations and seed through `scripts/cloudflare-build.sh`, then builds the Worker with OpenNext. It prepares the local R2 cache with `opennextjs-cloudflare populateCache local`. The cache state stays in the temporary directory. It starts `wrangler dev --local` on a free loopback port.
+- The public route must render the seeded business and its structured data. Anonymous access to `/moderacao` must return the Next 404 refusal without action forms. Worker errors fail the command. The Next HTTP tests still check authorized writes and denied writes against the database.
+- The command creates a temporary Wrangler configuration without production routes or the upload binding. The R2 cache is local only. `DATABASE_URL`, `DATABASE_URL_UNPOOLED`, and Hyperdrive use the same separate database. Child processes receive only explicit test settings. Local `.env*` and `.dev.vars*` files stop execution before migration, except `.example` templates. The command does not read these files.
+- On success or failure, the command stops its Worker and removes its database, temporary configuration, and local cache. It does not publish resources.
   - Dois workflows avisam sem bloquear o merge: a **auditoria de dependências** (`npm audit`, em todo PR e todo dia sobre a `stage`) e o **CodeQL** (análise estática do código, em todo PR, a cada push e toda segunda). Os alertas do CodeQL ficam na aba Security.
   - O **Dependabot** abre PRs para a `stage` toda segunda com as versões novas do npm e das Actions, só depois de alguns dias publicadas (`.github/dependabot.yml`). As Actions ficam presas pelo SHA do commit.
 
@@ -831,7 +872,7 @@ Para trocar o slug de uma causa existente, crie uma migração que atualize `Emp
 ### Criar uma ação de moderação
 
 1. Crie a Server Action em `src/acoes/moderacao.ts`, começando por `exigirModerador()`.
-2. Registre na auditoria com `registrarAuditoria`, com uma ação no formato `alvo.verbo` (por exemplo, `empresa.despublicada`), e acrescente a descrição dela em `ACOES_AUDITORIA` (`src/lib/dominio.ts`).
+2. Registre na auditoria com `registrarAuditoria(tx, ...)`, dentro da mesma transação da decisão (nunca com `db`, para uma falha no registro também desfazer a decisão), com uma ação no formato `alvo.verbo` (por exemplo, `empresa.despublicada`), e acrescente a descrição dela em `ACOES_AUDITORIA` (`src/lib/dominio.ts`).
 3. Volte para a aba certa com um aviso: `redirect("/moderacao?aba=…&aviso=feito")`. Se o botão fica numa lista com busca, filtro ou página, mande a lista num campo `voltar` e redirecione com `destinoNaModeracao` e `comAviso`, como em `moderarEmpresa`.
 4. Atualize a [tabela da auditoria](regras-de-negocio.md#13-auditoria).
 
