@@ -1,7 +1,7 @@
 import "server-only";
 import { createHash } from "node:crypto";
 import { headers } from "next/headers";
-import { ipDoCabecalho, JANELA_MS } from "@/lib/auth/tentativas";
+import { ipDoCabecalho } from "@/lib/auth/tentativas";
 import { db } from "@/lib/db";
 
 /**
@@ -10,6 +10,8 @@ import { db } from "@/lib/db";
  * privada da infraestrutura; estes são apenas orçamentos de escrita da aplicação.
  */
 export type OperacaoControlada = "depoimento" | "denuncia" | "indicacao" | "reivindicacao";
+
+const JANELA_ESCRITA_MS = 15 * 60 * 1000;
 
 const ORCAMENTOS = {
   depoimento: { conta: 8, origem: 200, negocio: 60 },
@@ -33,7 +35,7 @@ function chave(operacao: OperacaoControlada, escopo: string, valor: string): str
  */
 async function reservar(chaveDoContador: string, limite: number): Promise<boolean> {
   const agora = new Date();
-  const inicio = new Date(agora.getTime() - JANELA_MS);
+  const inicio = new Date(agora.getTime() - JANELA_ESCRITA_MS);
   const teto = limite + 1;
   const [linha] = await db.$queryRaw<{ contagem: number }[]>`
     INSERT INTO "TentativaAcesso" ("chave", "contagem", "janelaIniciadaEm", "email")
@@ -96,7 +98,7 @@ export async function reservarEscrita({
   }
   // Limpeza amostrada: evitar varrer toda a tabela a cada envio, mesmo sob carga.
   if (Math.random() < 0.01) {
-    const vencidas = new Date(Date.now() - 2 * JANELA_MS);
+    const vencidas = new Date(Date.now() - 2 * JANELA_ESCRITA_MS);
     await db.tentativaAcesso.deleteMany({ where: { janelaIniciadaEm: { lt: vencidas } } });
   }
   return true;

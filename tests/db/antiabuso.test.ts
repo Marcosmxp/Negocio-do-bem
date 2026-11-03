@@ -27,12 +27,20 @@ describe("reserva atómica de operações de escrita (#104)", () => {
     expect(await reservarEscrita({ operacao: "depoimento", usuarioId: randomUUID(), negocioId, origem: null })).toBe(true);
   });
 
-  it("limita agregados por negócio mesmo com diferentes contas", async () => {
+  it("limita agregados por negócio mesmo com diferentes contas concorrentes", async () => {
     const negocioId = randomUUID();
-    const resultados = await Promise.all(Array.from({ length: 66 }, () =>
+    expect(await reservarEscrita({
+      operacao: "depoimento", usuarioId: randomUUID(), negocioId, origem: null,
+    })).toBe(true);
+    const chave = createHash("sha256")
+      .update(JSON.stringify(["ndb:escrita:v1", "depoimento", "negocio", negocioId]))
+      .digest("hex");
+    await db.tentativaAcesso.update({ where: { chave }, data: { contagem: 59 } });
+
+    const resultados = await Promise.all(Array.from({ length: 8 }, () =>
       reservarEscrita({ operacao: "depoimento", usuarioId: randomUUID(), negocioId, origem: null }),
     ));
-    expect(resultados.filter(Boolean)).toHaveLength(60);
+    expect(resultados.filter(Boolean)).toHaveLength(1);
   });
 
   it("aplica a cota de origem confiável mesmo quando as contas são diferentes", async () => {

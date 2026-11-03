@@ -38,14 +38,15 @@ export async function publicarDepoimento(_estado: EstadoFormulario, dados: FormD
     return { erros: { texto: resultado.error.issues[0]?.message ?? "Texto inválido." }, valores: valoresDoFormulario(dados) };
   }
 
+  // Mesmo uma tentativa duplicada consome cota: não permitir consultas ilimitadas
+  // à relação autor/negócio por um utilizador já autenticado.
+  if (!(await reservarEscrita({ operacao: "depoimento", usuarioId: usuario.id, negocioId: empresa.id }))) {
+    return { erro: MENSAGEM_CONTENCAO, valores: valoresDoFormulario(dados) };
+  }
   const jaEscreveu = await db.depoimento.findUnique({
     where: { empresaId_autorId: { empresaId: empresa.id, autorId: usuario.id } },
   });
   if (jaEscreveu) return { erro: "Você já deixou um depoimento para este negócio. Obrigado!" };
-
-  if (!(await reservarEscrita({ operacao: "depoimento", usuarioId: usuario.id, negocioId: empresa.id }))) {
-    return { erro: MENSAGEM_CONTENCAO, valores: valoresDoFormulario(dados) };
-  }
 
   const depoimento = await db.depoimento.create({ data: { empresaId: empresa.id, autorId: usuario.id, texto: resultado.data } });
   after(() => avisarNovoDepoimento(depoimento.id));
