@@ -10,12 +10,17 @@ const CORES: Record<Tinta, string> = {
   terracota: "bg-[color:var(--color-terracota,#b4502c)] text-[color:var(--color-sobre-terracota,#fffaf2)]",
 };
 
+/** As classes de cor do monograma de quem tem essa chave (o @ do negócio ou do embaixador). */
+export function paletaDe(chave: string): string {
+  return CORES[tintaDoNegocio(chave)];
+}
+
 export function Monograma({ nome, chave, tamanho = "md" }: { nome: string; chave: string; tamanho?: "md" | "lg" }) {
   const dimensoes = tamanho === "lg" ? "h-24 w-24 text-3xl ring-4" : "h-12 w-12 text-base ring-2";
   return (
     <span
       aria-hidden="true"
-      className={`grid shrink-0 place-items-center rounded-full font-serif font-semibold ring-superficie ${dimensoes} ${CORES[tintaDoNegocio(chave)]}`}
+      className={`grid shrink-0 place-items-center rounded-full font-serif font-semibold ring-superficie ${dimensoes} ${paletaDe(chave)}`}
     >
       {iniciais(nome)}
     </span>

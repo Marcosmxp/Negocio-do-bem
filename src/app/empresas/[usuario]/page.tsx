@@ -1,11 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Suspense, type CSSProperties } from "react";
+import { Suspense } from "react";
 import { denunciarDepoimento } from "@/acoes/depoimentos";
 import { AvisoDaUrl } from "@/components/Avisos";
+import { BotaoCopiarLink } from "@/components/BotaoCopiarLink";
+import { CapaDoNegocio } from "@/components/CapaDoNegocio";
 import { CausaBadge } from "@/components/CausaBadge";
 import { ConfirmarEmail } from "@/components/ConfirmarEmail";
+import { EmpresaLinha } from "@/components/EmpresaLinha";
 import { Historia } from "@/components/Historia";
 import { JsonLd } from "@/components/JsonLd";
 import { FotoEmpresa } from "@/components/FotoEmpresa";
@@ -13,9 +16,8 @@ import { InstagramIcone, WhatsAppIcone } from "@/components/Icones";
 import { LinkInstagram } from "@/components/LinkInstagram";
 import { SeloStatus } from "@/components/SeloStatus";
 import { usuarioAtual, type UsuarioSessao } from "@/lib/auth/sessao";
-import { buscarCausa, filtrarCausas } from "@/lib/causas";
-import { buscarPerfil, ehDono, podeVerPerfil } from "@/lib/consultas";
-import { tintaDoNegocio } from "@/lib/cortejo";
+import { buscarCausa, filtrarCausas, GRUPOS, type GrupoCausa } from "@/lib/causas";
+import { buscarPerfil, ehDono, negociosParecidos, podeVerPerfil } from "@/lib/consultas";
 import { hrefCausa, hrefTipo, temPaginaDeTipo } from "@/lib/diretorio";
 import { MODERACAO_EMPRESA } from "@/lib/dominio";
 import { temInstagram } from "@/lib/endereco";
@@ -24,7 +26,6 @@ import { medirContato, type CanalDeContato } from "@/lib/medicao";
 import { FORA_DA_BUSCA, jsonLdDoNegocio, metadadosDaPagina, paginaDaCidade } from "@/lib/seo";
 import { formatarData, formatarTelefone, tempoDeLeitura } from "@/lib/texto";
 import { FormDepoimento } from "./FormDepoimento";
-import "./perfil.css";
 
 export async function generateMetadata(props: PageProps<"/empresas/[usuario]">): Promise<Metadata> {
   const username = normalizarEndereco((await props.params).usuario);
@@ -59,187 +60,393 @@ async function Perfil({ params, searchParams }: Pick<PageProps<"/empresas/[usuar
   const dono = ehDono(empresa, usuario);
   const causas = filtrarCausas(empresa.causas.map((c) => c.causa));
   const publico = empresa.moderacao === "aprovada" && !empresa.oculta;
-  const tinta = tintaDoNegocio(empresa.instagramUsername);
-  const cores = {
-    "--tinta-negocio": `var(--color-${tinta})`,
-    "--texto-negocio": `var(--color-${tinta}-texto)`,
-  } as CSSProperties;
   // Os cliques nos contatos contam no Analytics só quando vêm do público, não do dono.
   const contato = publico && !dono ? empresa : undefined;
 
   return (
-    <article className={"cortejo-perfil"} style={cores}>
+    <article>
       {publico && <JsonLd dados={jsonLdDoNegocio(empresa, causas.map((slug) => buscarCausa(slug)!.nome))} />}
-      <header className={"cortejo-perfil-cabecalho"}>
-        <div className={"cortejo-perfil-abertura"}>
-          <Link href="/explorar" className={"cortejo-perfil-voltar"}>
-            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="m8 4-6 6 6 6M2 10h16" /></svg>
-            Explorar negócios
-          </Link>
-          <div className={"cortejo-perfil-avisos"}>
-            <AvisoDaUrl codigo={aviso} />
-            {!publico && (
-              <p className={"cortejo-perfil-restrito"}>
-                {empresa.oculta
-                  ? "Este perfil está oculto pelo dono e não aparece no diretório."
-                  : `${MODERACAO_EMPRESA[empresa.moderacao]}: só você e a moderação veem este perfil por enquanto.`}
-              </p>
+      <div className="mx-auto max-w-5xl px-4 pt-6 sm:px-6">
+        <div className="mb-6 space-y-3 empty:hidden">
+          <AvisoDaUrl codigo={aviso} />
+          {!publico && (
+            <p className="rounded-2xl border border-linha bg-superficie px-4 py-3 text-sm text-suave">
+              {empresa.oculta
+                ? "Este perfil está oculto pelo dono e não aparece no diretório."
+                : `${MODERACAO_EMPRESA[empresa.moderacao]}: só você e a moderação veem este perfil por enquanto.`}
+            </p>
+          )}
+        </div>
+
+        <CapaDoNegocio cidade={empresa.cidade} uf={empresa.uf} />
+
+        <header className="flex flex-col gap-5 px-1 sm:flex-row sm:items-start sm:px-6">
+          {/* No celular a foto fica abaixo do crédito da capa; a partir do sm, sobre a capa, e o crédito vai para a direita. */}
+          <div className="mt-4 shrink-0 self-start sm:-mt-12">
+            <FotoEmpresa empresa={empresa} tamanho="lg" />
+          </div>
+          <div className="min-w-0 flex-1 space-y-2">
+            <SeloStatus status={empresa.status} />
+            <h1 className="font-serif text-[clamp(1.75rem,5vw,2.625rem)] leading-[1.1] font-semibold tracking-tight text-balance">{empresa.nome}</h1>
+            <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-suave">
+              {/* Sem WhatsApp, o botão principal já leva ao Instagram: não repete o link aqui. */}
+              {(empresa.whatsapp || !temInstagram(empresa.instagramUsername)) && (
+                <>
+                  <LinkInstagram endereco={empresa.instagramUsername} icone contato={contato} />
+                  <span aria-hidden="true">·</span>
+                </>
+              )}
+              {publico && temPaginaDeTipo(empresa.categoria) ? (
+                <Link href={hrefTipo(empresa.categoria)} className="hover:text-tinta hover:underline">
+                  {empresa.categoria}
+                </Link>
+              ) : (
+                <span>{empresa.categoria}</span>
+              )}
+              <span aria-hidden="true">·</span>
+              {publico ? (
+                <Link href={paginaDaCidade(empresa.cidade, empresa.uf).caminho} className="hover:text-tinta hover:underline">
+                  {empresa.cidade}, {empresa.uf}
+                </Link>
+              ) : (
+                <span>
+                  {empresa.cidade}, {empresa.uf}
+                </span>
+              )}
+            </p>
+            <Acoes empresa={empresa} medir={!!contato} compartilhar={publico} />
+          </div>
+        </header>
+
+        <p className="mx-1 mt-8 max-w-[52ch] border-l-[3px] border-coral py-0.5 pl-4 font-serif text-[1.375rem] leading-snug font-medium text-tinta italic text-pretty sm:mx-6">{empresa.resumo}</p>
+
+        {(dono || usuario?.moderador) && (
+          <div className="mt-6 px-1 sm:px-6">
+            {dono ? (
+              <Link href={`/painel/${empresa.instagramUsername}`} className="botao">
+                Editar meu perfil
+              </Link>
+            ) : (
+              <Link href={`/moderacao/negocios/${empresa.instagramUsername}`} className="botao">
+                Editar perfil (moderação)
+              </Link>
             )}
           </div>
-
-          <div className={"cortejo-perfil-identidade"}>
-            <div className={"cortejo-perfil-retrato"}><FotoEmpresa empresa={empresa} tamanho="lg" /></div>
-            <div className={"cortejo-perfil-nome"}>
-              <SeloStatus status={empresa.status} />
-              <h1>{empresa.nome}</h1>
-              <div className={"cortejo-perfil-metadados"}>
-                <LinkInstagram endereco={empresa.instagramUsername} icone contato={contato} />
-                {publico && temPaginaDeTipo(empresa.categoria) ? <Link href={hrefTipo(empresa.categoria)}>{empresa.categoria}</Link> : <span>{empresa.categoria}</span>}
-                {publico ? (
-                  <Link href={paginaDaCidade(empresa.cidade, empresa.uf).caminho}>{empresa.cidade}, {empresa.uf}</Link>
-                ) : <span>{empresa.cidade}, {empresa.uf}</span>}
-              </div>
-            </div>
-          </div>
-          <p className={"cortejo-perfil-resumo"}>{empresa.resumo}</p>
-          <Contatos empresa={empresa} medir={!!contato} />
-
-          {causas.length > 0 && (
-            <section className={"cortejo-perfil-causas"} aria-label="Causas do negócio">
-              <h2>As causas que abraçam</h2>
-              <div>
-                {causas.map((slug) => publico ? (
-                  <Link key={slug} href={hrefCausa(slug)}><CausaBadge slug={slug} grande /></Link>
-                ) : <CausaBadge key={slug} slug={slug} grande />)}
-              </div>
-            </section>
-          )}
-          {dono ? (
-            <Link href={`/painel/${empresa.instagramUsername}`} className={`botao-claro cortejo-perfil-editar`}>Editar meu perfil</Link>
-          ) : usuario?.moderador ? (
-            <Link href={`/moderacao/negocios/${empresa.instagramUsername}`} className={`botao-claro cortejo-perfil-editar`}>Editar perfil (moderação)</Link>
-          ) : null}
-        </div>
-      </header>
-
-      <div className={"cortejo-perfil-conteudo"}>
-        <section className={"cortejo-perfil-historia"}>
-          {empresa.historia.trim() ? (
-            <>
-              <h2>Nossa história</h2>
-              <p className={"cortejo-perfil-dadosHistoria"}>
-                <span>{tempoDeLeitura(empresa.historia)} min de leitura</span>
-                <span>Atualizada em <time dateTime={empresa.atualizadoEm.toISOString()}>{formatarData(empresa.atualizadoEm)}</time></span>
-              </p>
-              <Historia markdown={empresa.historia} />
-            </>
-          ) : <SemHistoria empresa={empresa} dono={dono} />}
-        </section>
-        {empresa.status !== "verificada" && !dono && <ChamadaReivindicar username={empresa.instagramUsername} />}
-        <Depoimentos empresa={empresa} usuario={usuario} dono={dono} publico={publico} />
-        {empresa.status === "verificada" && !dono && (
-          <p className={"cortejo-perfil-disputa"}>
-            Este perfil é seu e outra pessoa assumiu?{" "}
-            <Link href={`/empresas/${empresa.instagramUsername}/reivindicar`} className="link">Fale com a moderação</Link>
-          </p>
         )}
       </div>
+
+      <div className="mx-auto mt-10 grid max-w-5xl gap-x-12 gap-y-2 border-t border-linha px-4 sm:px-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
+        <aside className="pt-8 lg:col-start-2 lg:row-start-1 lg:pt-12">
+          <div className="space-y-4 lg:sticky lg:top-24">
+            <CartaoDeContato empresa={empresa} medir={!!contato} lugarComLink={publico} />
+          </div>
+        </aside>
+
+        <div className="min-w-0 lg:col-start-1 lg:row-start-1">
+          <section className="py-10 lg:py-12">
+            {empresa.historia.trim() ? (
+              <>
+                <p className="mb-6 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                  <span className="text-xs font-semibold tracking-[0.2em] text-coral-700 uppercase">Nossa história</span>
+                  <span className="text-sm text-suave">
+                    {tempoDeLeitura(empresa.historia)} min de leitura · atualizada em {formatarData(empresa.atualizadoEm)}
+                  </span>
+                </p>
+                <Historia markdown={empresa.historia} />
+              </>
+            ) : (
+              <SemHistoria empresa={empresa} dono={dono} />
+            )}
+          </section>
+
+          <Causas causas={causas} link={publico} />
+
+          {empresa.status !== "verificada" && !dono && (
+            <div className="border-t border-linha pt-10">
+              <ChamadaReivindicar username={empresa.instagramUsername} />
+            </div>
+          )}
+
+          <Depoimentos empresa={empresa} usuario={usuario} dono={dono} publico={publico} />
+
+          {empresa.status === "verificada" && !dono && (
+            <p className="mt-12 text-center text-sm text-suave">
+              Este perfil é seu e outra pessoa assumiu?{" "}
+              <Link href={`/empresas/${empresa.instagramUsername}/reivindicar`} className="link">
+                Fale com a moderação
+              </Link>
+            </p>
+          )}
+        </div>
+      </div>
+
+      {publico && (
+        <Suspense fallback={null}>
+          <Parecidos empresa={empresa} />
+        </Suspense>
+      )}
     </article>
   );
 }
 
-/**
- * Os botões de contato. WhatsApp, Instagram e site abrem numa aba nova, para a pessoa não sair do site.
- * Com `medir`, cada clique vira o evento `contato_negocio` no Analytics.
- */
-function Contatos({ empresa, medir }: { empresa: Perfil; medir: boolean }) {
+/** O que a pessoa pode fazer logo no topo: o contato principal e compartilhar. */
+function Acoes({ empresa, medir, compartilhar }: { empresa: Perfil; medir: boolean; compartilhar: boolean }) {
   const instagram = temInstagram(empresa.instagramUsername);
-  if (!empresa.telefoneComercial && !empresa.whatsapp && !instagram && !empresa.site && !empresa.emailContato) return null;
   const medida = (canal: CanalDeContato) => (medir ? medirContato(canal, empresa) : {});
+  if (!empresa.whatsapp && !instagram && !compartilhar) return null;
   return (
-    <div className={"cortejo-perfil-contatos"}>
-      {empresa.telefoneComercial && (
-        <a href={`tel:+${empresa.telefoneComercial}`} className="botao botao-pequeno" {...medida("telefone")}>
-          Ligar {formatarTelefone(empresa.telefoneComercial)}
-        </a>
-      )}
-      {empresa.whatsapp && (
+    <div className="flex flex-wrap items-center gap-2 pt-3">
+      {empresa.whatsapp ? (
         <a
           href={`https://wa.me/${empresa.whatsapp}`}
           target="_blank"
           rel="noopener noreferrer"
-          className="botao botao-pequeno"
+          className="botao-coral px-5 py-2.5"
           {...medida("whatsapp")}
         >
           <WhatsAppIcone />
-          WhatsApp {formatarTelefone(empresa.whatsapp)}
+          Chamar no WhatsApp
         </a>
+      ) : (
+        instagram && (
+          <a
+            href={linkPerfil(empresa.instagramUsername)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="botao-coral px-5 py-2.5"
+            {...medida("instagram")}
+          >
+            <InstagramIcone />
+            Ver no Instagram
+          </a>
+        )
       )}
-      {instagram && (
-        <a
-          href={linkPerfil(empresa.instagramUsername)}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="botao-claro botao-pequeno"
-          {...medida("instagram")}
-        >
-          <InstagramIcone />
-          Instagram
-        </a>
-      )}
-      {empresa.site && (
-        <a href={empresa.site} target="_blank" rel="noopener noreferrer nofollow" className="botao-claro botao-pequeno" {...medida("site")}>
-          {new URL(empresa.site).hostname.replace(/^www\./, "")} ↗
-        </a>
-      )}
-      {empresa.emailContato && (
-        // break-all: um e-mail comprido quebra em vez de passar da largura do celular.
-        <a href={`mailto:${empresa.emailContato}`} className="botao-claro botao-pequeno max-w-full break-all" {...medida("email")}>
-          {empresa.emailContato}
-        </a>
+      {compartilhar && (
+        <BotaoCopiarLink caminho={`/empresas/${empresa.instagramUsername}`} className="botao-claro px-5 py-2.5">
+          Compartilhar
+        </BotaoCopiarLink>
       )}
     </div>
+  );
+}
+
+/**
+ * Todos os contatos do negócio, só os preenchidos. WhatsApp, Instagram e site abrem numa aba nova, para a
+ * pessoa não sair do site. Com `medir`, cada clique vira o evento `contato_negocio` no Analytics.
+ */
+function CartaoDeContato({ empresa, medir, lugarComLink }: { empresa: Perfil; medir: boolean; lugarComLink: boolean }) {
+  const instagram = temInstagram(empresa.instagramUsername);
+  const medida = (canal: CanalDeContato) => (medir ? medirContato(canal, empresa) : {});
+  const linha = "block rounded-xl px-3 py-2 transition hover:bg-papel";
+  const rotulo = "block text-xs text-suave";
+  const onde = `${empresa.cidade}, ${empresa.uf}`;
+  return (
+    <div className="cartao p-3">
+      <h2 className="px-3 pt-2 pb-1 text-xs font-semibold tracking-[0.2em] text-suave uppercase">Contato</h2>
+      <ul className="text-sm">
+        {empresa.telefoneComercial && (
+          <li>
+            <a href={`tel:+${empresa.telefoneComercial}`} className={linha} {...medida("telefone")}>
+              <span className={rotulo}>Telefone</span>
+              <span className="font-medium">{formatarTelefone(empresa.telefoneComercial)}</span>
+            </a>
+          </li>
+        )}
+        {empresa.whatsapp && (
+          <li>
+            <a href={`https://wa.me/${empresa.whatsapp}`} target="_blank" rel="noopener noreferrer" className={linha} {...medida("whatsapp")}>
+              <span className={rotulo}>WhatsApp</span>
+              <span className="font-medium">{formatarTelefone(empresa.whatsapp)}</span>
+            </a>
+          </li>
+        )}
+        {instagram && (
+          <li>
+            <a href={linkPerfil(empresa.instagramUsername)} target="_blank" rel="noopener noreferrer" className={linha} {...medida("instagram")}>
+              <span className={rotulo}>Instagram</span>
+              <span className="font-medium">@{empresa.instagramUsername}</span>
+            </a>
+          </li>
+        )}
+        {empresa.site && (
+          <li>
+            <a href={empresa.site} target="_blank" rel="noopener noreferrer nofollow" className={linha} {...medida("site")}>
+              <span className={rotulo}>Site</span>
+              <span className="font-medium break-all">{new URL(empresa.site).hostname.replace(/^www\./, "")} ↗</span>
+            </a>
+          </li>
+        )}
+        {empresa.emailContato && (
+          <li>
+            {/* break-all: um e-mail comprido quebra em vez de passar da largura do celular. */}
+            <a href={`mailto:${empresa.emailContato}`} className={linha} {...medida("email")}>
+              <span className={rotulo}>E-mail</span>
+              <span className="font-medium break-all">{empresa.emailContato}</span>
+            </a>
+          </li>
+        )}
+        <li>
+          {lugarComLink ? (
+            <Link href={paginaDaCidade(empresa.cidade, empresa.uf).caminho} className={linha}>
+              <span className={rotulo}>Cidade</span>
+              <span className="font-medium">{onde}</span>
+            </Link>
+          ) : (
+            <span className={linha}>
+              <span className={rotulo}>Cidade</span>
+              <span className="font-medium">{onde}</span>
+            </span>
+          )}
+        </li>
+      </ul>
+    </div>
+  );
+}
+
+/** As causas do negócio, separadas pelos mesmos grupos do filtro do diretório. */
+function Causas({ causas, link }: { causas: string[]; link: boolean }) {
+  if (causas.length === 0) return null;
+  const grupos = (Object.keys(GRUPOS) as GrupoCausa[])
+    .map((grupo) => ({ grupo, slugs: causas.filter((slug) => buscarCausa(slug)?.grupo === grupo) }))
+    .filter((g) => g.slugs.length > 0);
+  return (
+    <section className="border-t border-linha py-10 lg:py-12">
+      <h2 className="font-serif text-3xl font-semibold">O que este negócio defende</h2>
+      {link && <p className="mt-1 text-suave">Toque em uma causa para ver outros negócios que também a defendem.</p>}
+      <div className="mt-6 space-y-5">
+        {grupos.map(({ grupo, slugs }) => (
+          <div key={grupo}>
+            <h3 className="mb-2 text-xs font-semibold tracking-[0.2em] text-suave uppercase">{GRUPOS[grupo]}</h3>
+            <div className="flex flex-wrap gap-2">
+              {slugs.map((slug) =>
+                link ? (
+                  <Link key={slug} href={hrefCausa(slug)} className="transition hover:opacity-80">
+                    <CausaBadge slug={slug} grande />
+                  </Link>
+                ) : (
+                  <CausaBadge key={slug} slug={slug} grande />
+                ),
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
 
 function SemHistoria({ empresa, dono }: { empresa: Perfil; dono: boolean }) {
-  if (dono) return (
-    <div className={"cortejo-perfil-conviteHistoria"}>
-      <h2>Conte a história do seu negócio</h2>
-      <p>Como tudo começou, o que move vocês, quem faz acontecer. É aqui que a comunidade conhece vocês de verdade.</p>
-      <Link href={`/painel/${empresa.instagramUsername}`} className="botao-coral">Escrever nossa história</Link>
-    </div>
-  );
-  if (empresa.motivoIndicacao) return (
-    <figure className={"cortejo-perfil-bilhete"}>
-      <h2>Por que foi indicado</h2>
-      <blockquote>“{empresa.motivoIndicacao}”</blockquote>
-      {empresa.indicadaPor && <figcaption>Indicado por {empresa.indicadaPor.nome}</figcaption>}
-    </figure>
-  );
-  return <p className={"cortejo-perfil-semHistoria"}>A história deste negócio ainda vai ser contada.</p>;
+  if (dono) {
+    return (
+      <div className="cartao p-8 text-center">
+        <p className="font-serif text-2xl">Conte a história do seu negócio</p>
+        <p className="mx-auto mt-2 max-w-md text-suave">
+          Como tudo começou, o que move vocês, quem faz acontecer. É aqui que a comunidade conhece vocês de verdade.
+        </p>
+        <Link href={`/painel/${empresa.instagramUsername}`} className="botao-coral mt-6">
+          Escrever nossa história
+        </Link>
+      </div>
+    );
+  }
+  if (empresa.motivoIndicacao) {
+    return (
+      <figure className="cartao p-8">
+        <p className="mb-4 text-xs font-semibold tracking-[0.2em] text-coral-700 uppercase">Por que foi indicado</p>
+        <blockquote className="font-serif text-2xl leading-relaxed text-tinta/85">“{empresa.motivoIndicacao}”</blockquote>
+        {empresa.indicadaPor && (
+          <figcaption className="mt-4 text-sm text-suave">— indicado por {empresa.indicadaPor.nome}</figcaption>
+        )}
+      </figure>
+    );
+  }
+  return <p className="text-center font-serif text-xl text-suave italic">A história deste negócio ainda vai ser contada.</p>;
 }
 
 function ChamadaReivindicar({ username }: { username: string }) {
   return (
-    <aside className={"cortejo-perfil-assumir"}>
+    <aside className="mb-12 flex flex-col gap-4 rounded-3xl border border-dashed border-coral/40 bg-coral-50/60 p-6 sm:flex-row sm:items-center sm:justify-between">
       <div>
-        <p>Este negócio é seu?</p>
-        <p>Reivindique o perfil para contar a sua história, escolher suas causas e responder à comunidade.</p>
+        <p className="font-semibold">Este negócio é seu?</p>
+        <p className="text-sm text-suave">
+          Reivindique o perfil para contar a sua história, escolher suas causas e responder à comunidade.
+        </p>
       </div>
-      <Link href={`/empresas/${username}/reivindicar`} className="botao-coral">Sou o dono</Link>
+      <Link href={`/empresas/${username}/reivindicar`} className="botao-coral shrink-0">
+        Sou o dono
+      </Link>
     </aside>
   );
 }
 
-function Depoimentos({ empresa, usuario, dono, publico }: { empresa: Perfil; usuario: UsuarioSessao | null; dono: boolean; publico: boolean }) {
+function Depoimentos({
+  empresa,
+  usuario,
+  dono,
+  publico,
+}: {
+  empresa: Perfil;
+  usuario: UsuarioSessao | null;
+  dono: boolean;
+  publico: boolean;
+}) {
   const jaEscreveu = !!usuario && empresa.depoimentos.some((d) => d.autorId === usuario.id);
   return (
-    <section id="depoimentos" className={"cortejo-perfil-depoimentos"}>
-      <h2>Depoimentos da comunidade</h2>
-      <p>Experiências reais de quem conhece este negócio.</p>
+    <section id="depoimentos" className="scroll-mt-24 border-t border-linha py-10 lg:py-12">
+      <h2 className="font-serif text-3xl font-semibold">Depoimentos da comunidade</h2>
+      <p className="mt-1 text-suave">Experiências reais de quem conhece este negócio.</p>
+
+      <div className="mt-8 space-y-4">
+        {empresa.depoimentos.length === 0 && (
+          <p className="text-suave italic">
+            {dono ? "Ainda não há depoimentos. Peça para quem conhece o seu negócio escrever o primeiro." : "Ainda não há depoimentos. Que tal ser a primeira pessoa?"}
+          </p>
+        )}
+        {empresa.depoimentos.map((depoimento) => (
+          <figure key={depoimento.id} className="cartao p-6">
+            <blockquote className="font-serif text-lg leading-relaxed whitespace-pre-line text-tinta/90">
+              {depoimento.texto}
+            </blockquote>
+            <figcaption className="mt-4 flex flex-wrap items-center justify-between gap-2 text-sm text-suave">
+              <span>
+                <span className="font-medium text-tinta">{depoimento.autor.nome}</span> · {formatarData(depoimento.criadoEm)}
+              </span>
+              {usuario && usuario.id !== depoimento.autorId && !depoimento.denunciado && (
+                <details className="text-xs">
+                  <summary className="cursor-pointer list-none text-suave hover:text-coral-700 [&::-webkit-details-marker]:hidden">
+                    Denunciar
+                  </summary>
+                  <form action={denunciarDepoimento} className="mt-2 flex gap-2">
+                    <input type="hidden" name="depoimentoId" value={depoimento.id} />
+                    <input name="motivo" placeholder="O que há de errado?" className="campo py-1.5 sm:text-xs" maxLength={300} />
+                    <button type="submit" className="botao-claro botao-pequeno">
+                      Enviar
+                    </button>
+                  </form>
+                </details>
+              )}
+            </figcaption>
+            {depoimento.resposta && (
+              <div className="mt-4 rounded-2xl bg-papel p-4 text-sm leading-relaxed">
+                <p className="mb-1 font-semibold text-tinta">Resposta de {empresa.nome}</p>
+                <p className="whitespace-pre-line text-suave">{depoimento.resposta}</p>
+              </div>
+            )}
+          </figure>
+        ))}
+      </div>
+
+      {dono && publico && (
+        <div className="cartao mt-8 flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-suave">Mande este link para clientes e vizinhos pedirem para escrever um depoimento.</p>
+          <BotaoCopiarLink caminho={`/empresas/${empresa.instagramUsername}#depoimentos`} className="botao-claro botao-pequeno shrink-0">
+            Copiar link dos depoimentos
+          </BotaoCopiarLink>
+        </div>
+      )}
+
       {publico && !dono && !jaEscreveu && (
-        <div className={"cortejo-perfil-formularioDepoimento"}>
+        <div className="mt-8">
           {usuario?.emailConfirmado ? (
             <FormDepoimento empresaId={empresa.id} nomeEmpresa={empresa.nome} />
           ) : usuario ? (
@@ -249,44 +456,56 @@ function Depoimentos({ empresa, usuario, dono, publico }: { empresa: Perfil; usu
               voltar={`/empresas/${empresa.instagramUsername}#depoimentos`}
             />
           ) : (
-            <div className={"cortejo-perfil-entrar"}>
-              <Link href={`/entrar?voltar=${encodeURIComponent(`/empresas/${empresa.instagramUsername}#depoimentos`)}`} className="botao-claro">Entrar para deixar um depoimento</Link>
-              <p>Sua experiência ajuda outras pessoas a conhecer este negócio.</p>
-            </div>
+            <p className="cartao p-5 text-sm text-suave">
+              <Link href={`/entrar?voltar=${encodeURIComponent(`/empresas/${empresa.instagramUsername}#depoimentos`)}`} className="link">
+                Entre
+              </Link>{" "}
+              para deixar seu depoimento.
+            </p>
           )}
         </div>
       )}
-      <div className={"cortejo-perfil-listaDepoimentos"}>
-        {empresa.depoimentos.length === 0 && <p className="text-suave italic">Ainda não há depoimentos. Que tal ser a primeira pessoa?</p>}
-        {empresa.depoimentos.map((depoimento) => (
-          <figure key={depoimento.id} className={"cortejo-perfil-depoimento"}>
-            <blockquote>{depoimento.texto}</blockquote>
-            <figcaption>
-              <span><strong>{depoimento.autor.nome}</strong> · <time dateTime={depoimento.criadoEm.toISOString()}>{formatarData(depoimento.criadoEm)}</time></span>
-              {usuario && usuario.id !== depoimento.autorId && !depoimento.denunciado && (
-                <details className={"cortejo-perfil-denuncia"}>
-                  <summary>Denunciar</summary>
-                  <form action={denunciarDepoimento}>
-                    <input type="hidden" name="depoimentoId" value={depoimento.id} />
-                    <input name="motivo" aria-label="Motivo da denúncia" placeholder="O que há de errado?" className="campo" maxLength={300} />
-                    <button type="submit" className="botao-claro botao-pequeno">Enviar</button>
-                  </form>
-                </details>
-              )}
-            </figcaption>
-            {depoimento.resposta && (
-              <div className={"cortejo-perfil-resposta"}>
-                <p>Resposta de {empresa.nome}</p>
-                <p>{depoimento.resposta}</p>
-              </div>
-            )}
-          </figure>
-        ))}
+    </section>
+  );
+}
+
+/** Outros negócios da mesma cidade, para a pessoa continuar explorando. */
+async function Parecidos({ empresa }: { empresa: Perfil }) {
+  const parecidos = await negociosParecidos(empresa);
+  if (parecidos.length === 0) return null;
+  const cidade = paginaDaCidade(empresa.cidade, empresa.uf);
+  return (
+    <section className="border-t border-linha bg-superficie/50 py-12">
+      <div className="mx-auto max-w-5xl px-4 sm:px-6">
+        <h2 className="font-serif text-3xl font-semibold">Mais negócios do bem em {empresa.cidade}</h2>
+        <div className="mt-6 space-y-3">
+          {parecidos.map((outro) => (
+            <EmpresaLinha key={outro.instagramUsername} empresa={outro} />
+          ))}
+        </div>
+        <p className="mt-6">
+          <Link href={cidade.caminho} className="link">
+            Ver todos em {empresa.cidade}, {empresa.uf}
+          </Link>
+        </p>
       </div>
     </section>
   );
 }
 
 function PerfilCarregando() {
-  return <div className={`cortejo-perfil-conteudo cortejo-perfil-carregando`} aria-busy="true" aria-label="Carregando perfil"><div /></div>;
+  return (
+    <div className="mx-auto max-w-5xl animate-pulse px-4 pt-6 sm:px-6" aria-busy="true">
+      <div className="h-48 rounded-3xl bg-superficie sm:h-64" />
+      <div className="flex items-center gap-6 px-6">
+        <div className="-mt-12 h-24 w-24 rounded-full bg-superficie ring-4 ring-papel" />
+        <div className="h-10 w-1/2 rounded-full bg-superficie" />
+      </div>
+      <div className="mt-10 space-y-3 px-6">
+        <div className="h-4 rounded-full bg-superficie" />
+        <div className="h-4 w-5/6 rounded-full bg-superficie" />
+        <div className="h-4 w-2/3 rounded-full bg-superficie" />
+      </div>
+    </div>
+  );
 }

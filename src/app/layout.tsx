@@ -135,6 +135,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
                 <p className="font-display text-xl font-bold uppercase">Comunidade</p>
                 <Link href="/explorar" className={`block w-fit ${LINK_DO_RODAPE}`}>Explorar negócios</Link>
                 <Link href="/cidades" className={`block w-fit ${LINK_DO_RODAPE}`}>Negócios por cidade</Link>
+                <Link href="/embaixadores" className={`block w-fit ${LINK_DO_RODAPE}`}>Embaixadores do bem</Link>
                 <Link href="/participar" className={`block w-fit ${LINK_DO_RODAPE}`}>Cadastrar um negócio</Link>
               </nav>
               <nav aria-label="Para negócios" className="space-y-2.5">

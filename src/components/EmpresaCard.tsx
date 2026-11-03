@@ -52,7 +52,7 @@ export function EmpresaCard({ empresa, compacta = false }: { empresa: EmpresaRes
         </Link>
 
         <div className="min-w-0">
-          <h3 className={`font-display leading-[1.08] font-extrabold tracking-tight [overflow-wrap:anywhere] ${compacta ? "text-xl sm:text-2xl" : "text-2xl @min-[34rem]:text-[2rem]"}`}>
+          <h3 className={`font-display leading-[1.08] font-extrabold tracking-tight line-clamp-2 [overflow-wrap:anywhere] ${compacta ? "text-xl sm:text-2xl" : "text-2xl @min-[34rem]:text-[2rem]"}`}>
             <Link href={href} className="decoration-[var(--tinta-negocio)] decoration-2 underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-tinta">
               {empresa.nome}
             </Link>

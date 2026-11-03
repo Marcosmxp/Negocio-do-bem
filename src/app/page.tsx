@@ -4,6 +4,7 @@ import { Suspense, type CSSProperties } from "react";
 import { BuscaDiretorio } from "@/components/BuscaDiretorio";
 import { Cortejo } from "@/components/cortejo/Cortejo";
 import { personagensDoCortejo } from "@/components/cortejo/dados";
+import { FaixaEmbaixadores } from "@/components/FaixaEmbaixadores";
 import { JsonLd } from "@/components/JsonLd";
 import { FAIXAS_DE_CAUSAS } from "@/lib/cortejo";
 import { listarCidades, recentesComFoto, resumoDoDiretorio } from "@/lib/consultas";
@@ -84,6 +85,10 @@ export default function Inicio() {
           </Laco>
         ))}
       </section>
+
+      <Suspense>
+        <FaixaEmbaixadores />
+      </Suspense>
 
       <Laco className="inicio-convite">
         <div>
