@@ -186,6 +186,8 @@ export async function moderarServico(dados: FormData): Promise<void> {
     });
     if (count) await registrarAuditoria(tx, {
       usuarioId: moderador.id, acao: `servico.${status}`, alvoTipo: "servico", alvoId: id,
+      // O reenvio limpa os motivos do anúncio, mas não pode apagar o histórico da decisão.
+      detalhes: decisao.decisao === "aprovar" ? undefined : JSON.stringify({ motivo: decisao.motivo }),
     });
     return count;
   });
