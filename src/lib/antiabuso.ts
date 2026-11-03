@@ -14,7 +14,7 @@ export type OperacaoControlada = "depoimento" | "denuncia" | "indicacao" | "reiv
 const ORCAMENTOS = {
   depoimento: { conta: 8, origem: 200, negocio: 60 },
   denuncia: { conta: 12, origem: 200, negocio: 80 },
-  indicacao: { conta: 6, origem: 200, negocio: null },
+  indicacao: { conta: 24, origem: 200, negocio: null },
   reivindicacao: { conta: 5, origem: 200, negocio: 25 },
 } as const;
 
