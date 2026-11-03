@@ -141,7 +141,7 @@ describe("ações reais de serviços e decisões de moderação", () => {
     const evento = await db.registroAuditoria.findFirstOrThrow({
       where: { alvoTipo: "servico", alvoId: anuncioId, acao: "servico.rejeitado" },
     });
-    expect(JSON.parse(evento.detalhes ?? "{}")).toEqual({ motivo });
+    expect(evento.detalhes).toBe(`Motivo: ${motivo}`);
   });
 
   it("guarda a justificativa de suspensão mesmo após o reenvio", async () => {
@@ -159,7 +159,7 @@ describe("ações reais de serviços e decisões de moderação", () => {
     const evento = await db.registroAuditoria.findFirstOrThrow({
       where: { alvoTipo: "servico", alvoId: anuncioId, acao: "servico.suspenso" },
     });
-    expect(JSON.parse(evento.detalhes ?? "{}")).toEqual({ motivo });
+    expect(evento.detalhes).toBe(`Motivo: ${motivo}`);
   });
 
   it("impede a edição do anúncio por outra conta", async () => {
