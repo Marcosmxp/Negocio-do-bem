@@ -5,7 +5,7 @@ import { SEM_FILTROS, slugCategoria, type CidadeComNegocios, type FiltrosDiretor
 /** Busca por necessidade e lugar, sem perder os filtros que já estão na URL. */
 export function BuscaDiretorio({ cidades, filtros = SEM_FILTROS }: { cidades: CidadeComNegocios[]; filtros?: FiltrosDiretorio }) {
   return (
-    <Form action="/explorar" role="search" className="flex min-w-0 flex-wrap items-stretch gap-2 rounded-xl border border-borda-controle bg-superficie p-2">
+    <Form action="/explorar" role="search" data-cortina className="flex min-w-0 flex-wrap items-stretch gap-2 rounded-xl border border-borda-controle bg-superficie p-2">
       {filtros.tipos.map((tipo) => <input key={tipo} type="hidden" name="tipo" value={slugCategoria(tipo)} />)}
       {filtros.causas.map((causa) => <input key={causa} type="hidden" name="causa" value={causa} />)}
       {filtros.verificados && <input type="hidden" name="verificados" value="sim" />}

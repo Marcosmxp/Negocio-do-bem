@@ -15,49 +15,40 @@ vi.mock("react", async (original) => ({
   useCallback: (callback: unknown) => callback,
 }));
 vi.mock("next/navigation", () => ({
-  usePathname: () => "/explorar",
+  usePathname: () => "/",
+  useSearchParams: () => new URLSearchParams(),
   useRouter: () => ({ push: navegar }),
 }));
 
-class Elemento {
+class Formulario {
   constructor(
-    readonly atributos: Record<string, string> = {},
-    readonly pai: Elemento | null = null,
-    readonly isContentEditable = false,
+    readonly atributos: Record<string, string>,
+    readonly campos: [string, string][] = [["q", "padaria"], ["onde", ""]],
   ) {}
 
-  get href() { return this.atributos.href; }
-  getAttribute(nome: string) { return this.atributos[nome] ?? null; }
+  get action() { return this.atributos.action; }
   hasAttribute(nome: string) { return nome in this.atributos; }
-  closest(seletores: string): Elemento | null {
-    const corresponde = seletores.split(",").some((seletor) => {
-      const atual = seletor.trim();
-      if (atual === "a[href]") return this.hasAttribute("href");
-      const atributo = atual.match(/^\[([^=\]]+)(?:="([^"]*)")?\]$/);
-      return !!atributo && this.hasAttribute(atributo[1]) &&
-        (atributo[2] === undefined || this.getAttribute(atributo[1]) === atributo[2]);
-    });
-    return corresponde ? this : this.pai?.closest(seletores) ?? null;
-  }
 }
 
-let clicar: (evento: MouseEvent) => void;
+let ouvintes: Record<string, (evento: Event) => void>;
 let limpar: (() => void)[];
+let movimentoReduzido: boolean;
 
 beforeEach(() => {
   vi.useFakeTimers();
   efeitos.length = 0;
+  ouvintes = {};
+  movimentoReduzido = false;
   vi.clearAllMocks();
-  vi.stubGlobal("Element", Elemento);
-  vi.stubGlobal("location", { href: "https://exemplo.com/explorar", pathname: "/explorar" });
+  vi.stubGlobal("HTMLFormElement", Formulario);
+  vi.stubGlobal("FormData", class { constructor(readonly formulario: Formulario) {} [Symbol.iterator]() { return this.formulario.campos[Symbol.iterator](); } });
+  vi.stubGlobal("location", { href: "https://exemplo.com/", pathname: "/", search: "" });
   vi.stubGlobal("window", { __abertura: "aberta", addEventListener: vi.fn(), removeEventListener: vi.fn() });
-  vi.stubGlobal("matchMedia", () => ({ matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() }));
+  vi.stubGlobal("matchMedia", () => ({ get matches() { return movimentoReduzido; }, addEventListener: vi.fn(), removeEventListener: vi.fn() }));
   vi.stubGlobal("document", {
-    addEventListener: vi.fn((tipo: string, listener: (evento: MouseEvent) => void, captura?: boolean) => {
-      if (tipo === "click") {
-        expect(captura).toBe(true);
-        clicar = listener;
-      }
+    addEventListener: vi.fn((tipo: string, listener: (evento: Event) => void, captura?: boolean) => {
+      if (tipo === "submit") expect(captura).toBe(true);
+      ouvintes[tipo] = listener;
     }),
     removeEventListener: vi.fn(),
   });
@@ -71,67 +62,51 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-function clique(alvo: Elemento, prevenido = false) {
-  const evento = {
-    target: alvo,
-    button: 0,
-    defaultPrevented: prevenido,
-    preventDefault: vi.fn(),
-  };
-  clicar(evento as unknown as MouseEvent);
+function enviar(formulario: Formulario, prevenido = false) {
+  const evento = { target: formulario, submitter: null, defaultPrevented: prevenido, preventDefault: vi.fn() };
+  ouvintes.submit(evento as unknown as Event);
   return evento;
 }
 
-function link(pai: Elemento | null = null, editavel = false, atributos: Record<string, string> = {}) {
-  return new Elemento({ href: "https://exemplo.com/sobre", ...atributos }, pai, editavel);
-}
+const busca = (atributos: Record<string, string> = {}) =>
+  new Formulario({ action: "https://exemplo.com/explorar", "data-cortina": "", ...atributos });
 
-describe("interações no handler da cortina", () => {
-  it.each(["data-sem-cortina", "inert", "aria-disabled"])("preserva a navegação nativa na região %s", (atributo) => {
-    const regiao = new Elemento({ [atributo]: atributo === "aria-disabled" ? "true" : "" });
-    const evento = clique(new Elemento({}, link(regiao)));
-    expect(evento.preventDefault).not.toHaveBeenCalled();
-    expect(atualizarFase).not.toHaveBeenCalled();
-  });
-
-  it("não intercepta um link editável", () => {
-    const evento = clique(link(null, true));
-    expect(evento.preventDefault).not.toHaveBeenCalled();
-    expect(atualizarFase).not.toHaveBeenCalled();
-  });
-
-  it("não intercepta conteúdo editável dentro de um link", () => {
-    const evento = clique(new Elemento({ contenteditable: "true" }, link(), true));
-    expect(evento.preventDefault).not.toHaveBeenCalled();
-    expect(atualizarFase).not.toHaveBeenCalled();
-  });
-
-  it("não intercepta um ícone dentro de conteúdo editável", () => {
-    const texto = new Elemento({ contenteditable: "plaintext-only" }, link(), true);
-    const evento = clique(new Elemento({}, texto));
-    expect(evento.preventDefault).not.toHaveBeenCalled();
-    expect(atualizarFase).not.toHaveBeenCalled();
-  });
-
-  it("aceita a ilha não editável dentro de uma região editável", () => {
-    const regiao = new Elemento({ contenteditable: "true" }, null, true);
-    const evento = clique(link(regiao, false, { contenteditable: "false" }));
-    expect(evento.preventDefault).toHaveBeenCalledOnce();
-    expect(atualizarFase).toHaveBeenCalledWith("fechando");
-  });
-
-  it("continua interceptando links comuns e navega ao fim da proteção", () => {
-    const evento = clique(new Elemento({}, link()));
+describe("cortina só na busca", () => {
+  it("cobre a busca marcada e navega para o resultado ao fim da proteção", () => {
+    const evento = enviar(busca());
     expect(evento.preventDefault).toHaveBeenCalledOnce();
     expect(atualizarFase).toHaveBeenCalledWith("fechando");
     expect(navegar).not.toHaveBeenCalled();
     vi.runAllTimers();
-    expect(navegar).toHaveBeenCalledExactlyOnceWith("/sobre");
+    expect(navegar).toHaveBeenCalledExactlyOnceWith("/explorar?q=padaria&onde=");
   });
 
-  it("não intercepta evento previamente cancelado", () => {
-    const evento = clique(link(), true);
+  it("não escuta cliques em links: a navegação comum segue sem cortina", () => {
+    expect(ouvintes.click).toBeUndefined();
+  });
+
+  it("deixa nativo um formulário sem data-cortina", () => {
+    const evento = enviar(new Formulario({ action: "https://exemplo.com/explorar" }));
     expect(evento.preventDefault).not.toHaveBeenCalled();
     expect(atualizarFase).not.toHaveBeenCalled();
+  });
+
+  it("não intercepta um envio já cancelado", () => {
+    const evento = enviar(busca(), true);
+    expect(evento.preventDefault).not.toHaveBeenCalled();
+    expect(atualizarFase).not.toHaveBeenCalled();
+  });
+
+  it("não cobre a busca com menos movimento", () => {
+    movimentoReduzido = true;
+    const evento = enviar(busca());
+    expect(evento.preventDefault).not.toHaveBeenCalled();
+    expect(atualizarFase).not.toHaveBeenCalled();
+  });
+
+  it("não cobre a busca enquanto a abertura roda", () => {
+    vi.stubGlobal("window", { __abertura: "desenhando", addEventListener: vi.fn(), removeEventListener: vi.fn() });
+    const evento = enviar(busca());
+    expect(evento.preventDefault).not.toHaveBeenCalled();
   });
 });

@@ -1,46 +1,33 @@
-import { tintaDoNegocio, type Tinta } from "@/lib/cortejo";
-
 export type FaseCortina = "oculta" | "fechando" | "coberta" | "abrindo";
 export type EventoCortina = "iniciar" | "cobrir" | "revelar" | "terminar" | "cancelar";
-export type CliqueDaCortina = {
+export type BuscaDaCortina = {
+  /** Endereço completo da página onde a busca foi enviada. */
   atual: string;
-  href: string;
-  botao?: number;
-  ctrl?: boolean;
-  meta?: boolean;
-  shift?: boolean;
-  alt?: boolean;
-  alvo?: string | null;
-  download?: boolean;
-  prevenido?: boolean;
-  desativado?: boolean;
+  /** O `action` do formulário, já resolvido pelo navegador. */
+  acao: string;
+  /** Os campos do formulário, na ordem em que o navegador os enviaria. */
+  campos: [string, string][];
 };
-export type DestinoCortina = { href: string; caminho: string; tinta: Tinta | "verde-escuro" };
+export type DestinoCortina = { href: string };
 
-const caminho = (valor: string) => valor.replace(/\/+$/, "") || "/";
-
-/** Só links comuns de página: filtros, arquivos e ações seguem o navegador. */
-export function destinoDaCortina(clique: CliqueDaCortina): DestinoCortina | null {
-  if (clique.prevenido || clique.desativado || clique.download || (clique.botao ?? 0) !== 0 || clique.ctrl || clique.meta || clique.shift || clique.alt) return null;
-  if (clique.alvo && clique.alvo.toLowerCase() !== "_self") return null;
-
+/**
+ * A cortina só cobre a busca do diretório. Devolve o endereço do resultado,
+ * ou null quando o envio deve seguir o caminho nativo: outra origem, outro
+ * protocolo ou o mesmo resultado que já está na tela.
+ */
+export function destinoDaBusca(busca: BuscaDaCortina): DestinoCortina | null {
   let atual: URL;
   let destino: URL;
   try {
-    atual = new URL(clique.atual);
-    destino = new URL(clique.href, atual);
+    atual = new URL(busca.atual);
+    destino = new URL(busca.acao, atual);
   } catch {
     return null;
   }
-  if (!/^https?:$/.test(destino.protocol) || destino.origin !== atual.origin || caminho(destino.pathname) === caminho(atual.pathname)) return null;
-  if (/^\/(?:api|_next|enviados)(?:\/|$)/.test(destino.pathname) || /\.[a-z0-9]{2,5}$/i.test(destino.pathname) && !destino.pathname.startsWith("/empresas/")) return null;
-
-  const negocio = /^\/empresas\/([a-z0-9._]+)\/?$/i.exec(destino.pathname)?.[1];
-  return {
-    href: `${destino.pathname}${destino.search}${destino.hash}`,
-    caminho: caminho(destino.pathname),
-    tinta: negocio ? tintaDoNegocio(negocio.toLowerCase()) : "verde-escuro",
-  };
+  if (!/^https?:$/.test(destino.protocol) || destino.origin !== atual.origin) return null;
+  destino.search = new URLSearchParams(busca.campos).toString();
+  const href = `${destino.pathname}${destino.search}`;
+  return href === `${atual.pathname}${atual.search}` ? null : { href };
 }
 
 export function proximaFaseCortina(fase: FaseCortina, evento: EventoCortina): FaseCortina {

@@ -1,14 +1,19 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type CSSProperties, type TransitionEvent } from "react";
-import { usePathname, useRouter } from "next/navigation";
-import { destinoDaCortina, proximaFaseCortina, type DestinoCortina, type EventoCortina, type FaseCortina } from "@/lib/cortina";
+import { useCallback, useEffect, useRef, useState, type TransitionEvent } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { destinoDaBusca, proximaFaseCortina, type DestinoCortina, type EventoCortina, type FaseCortina } from "@/lib/cortina";
 import "./cortina.css";
 
 type Navegacao = DestinoCortina & { origem: string; enviada: boolean };
 
+/**
+ * A cortina cobre só a busca do diretório (formulários com `data-cortina`).
+ * Links e os outros formulários seguem a navegação nativa, sem animação.
+ */
 export function CortinaDePagina() {
   const caminho = usePathname();
+  const parametros = useSearchParams().toString();
   const router = useRouter();
   const roteador = useRef(router);
   const pendente = useRef<Navegacao | null>(null);
@@ -16,7 +21,6 @@ export function CortinaDePagina() {
   const seguranca = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const folha = useRef<HTMLDivElement>(null);
   const [fase, setFase] = useState<FaseCortina>("oculta");
-  const [tinta, setTinta] = useState<DestinoCortina["tinta"]>("verde-escuro");
 
   useEffect(() => { roteador.current = router; }, [router]);
 
@@ -41,36 +45,17 @@ export function CortinaDePagina() {
       if (navegacao && !navegacao.enviada) roteador.current.push(navegacao.href);
     }
 
-    function clicar(evento: MouseEvent) {
+    function enviar(evento: SubmitEvent) {
       if (movimento.matches || (window.__abertura && window.__abertura !== "aberta")) return;
-      const alvo = evento.target instanceof Element ? evento.target.closest<HTMLAnchorElement>("a[href]") : null;
-      if (!alvo) return;
-      // Uma área opt-out protege os handlers dos seus descendentes (ex.: diálogos
-      // e interfaces que controlam a navegação). Conteúdo editável é sempre nativo.
-      if (
-        evento.defaultPrevented ||
-        alvo.closest('[data-sem-cortina], [inert], [aria-disabled="true"]') ||
-        alvo.isContentEditable ||
-        (evento.target instanceof Element && evento.target.closest<HTMLElement>("[contenteditable]")?.isContentEditable)
-      ) return;
-      const destino = destinoDaCortina({
-        atual: location.href,
-        href: alvo.href,
-        botao: evento.button,
-        ctrl: evento.ctrlKey,
-        meta: evento.metaKey,
-        shift: evento.shiftKey,
-        alt: evento.altKey,
-        alvo: alvo.getAttribute("target"),
-        download: alvo.hasAttribute("download"),
-        prevenido: evento.defaultPrevented,
-        desativado: alvo.hasAttribute("data-sem-cortina") || alvo.getAttribute("aria-disabled") === "true",
-      });
+      const formulario = evento.target instanceof HTMLFormElement ? evento.target : null;
+      if (!formulario?.hasAttribute("data-cortina") || evento.defaultPrevented) return;
+      const campos = [...new FormData(formulario, evento.submitter)]
+        .filter((campo): campo is [string, string] => typeof campo[1] === "string");
+      const destino = destinoDaBusca({ atual: location.href, acao: formulario.action, campos });
       if (!destino) return;
       evento.preventDefault();
       if (pendente.current) return;
-      pendente.current = { ...destino, origem: location.pathname, enviada: false };
-      setTinta(destino.tinta);
+      pendente.current = { ...destino, origem: `${location.pathname}${location.search}`, enviada: false };
       mudar("iniciar");
       // Se o roteador ou um evento de transição falhar, a tela nunca prende a pessoa.
       seguranca.current = setTimeout(seguirSemCortina, 3200);
@@ -83,12 +68,12 @@ export function CortinaDePagina() {
       if (movimento.matches) seguirSemCortina();
     }
 
-    document.addEventListener("click", clicar, true);
+    document.addEventListener("submit", enviar, true);
     document.addEventListener("keydown", tecla);
     window.addEventListener("popstate", liberar);
     movimento.addEventListener("change", preferencia);
     return () => {
-      document.removeEventListener("click", clicar, true);
+      document.removeEventListener("submit", enviar, true);
       document.removeEventListener("keydown", tecla);
       window.removeEventListener("popstate", liberar);
       movimento.removeEventListener("change", preferencia);
@@ -99,12 +84,14 @@ export function CortinaDePagina() {
 
   useEffect(() => {
     const navegacao = pendente.current;
-    if (!navegacao?.enviada || !caminho || caminho === navegacao.origem) return;
+    // A busca no próprio Explorar só muda os parâmetros, então o endereço inteiro conta.
+    const endereco = `${caminho}${parametros ? `?${parametros}` : ""}`;
+    if (!navegacao?.enviada || !caminho || endereco === navegacao.origem) return;
     const quadro = requestAnimationFrame(() => {
       if (pendente.current === navegacao) mudar("revelar");
     });
     return () => cancelAnimationFrame(quadro);
-  }, [caminho, mudar]);
+  }, [caminho, parametros, mudar]);
 
   function terminou(evento: TransitionEvent<HTMLDivElement>) {
     if (evento.target !== folha.current || evento.propertyName !== "transform") return;
@@ -127,8 +114,7 @@ export function CortinaDePagina() {
   }
 
   return (
-    <div className="cortina-navegacao" data-fase={fase} aria-hidden="true" onTransitionEnd={terminou}
-      style={{ "--cortina-tinta": `var(--color-${tinta}, #1f5a3c)` } as CSSProperties}>
+    <div className="cortina-navegacao" data-fase={fase} aria-hidden="true" onTransitionEnd={terminou}>
       <div className="cortina-folha" ref={folha} />
       <div className="cortina-emblema" />
     </div>

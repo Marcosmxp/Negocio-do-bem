@@ -687,12 +687,10 @@ Erros que podem ser mostrados para a pessoa usam uma classe própria (`ErroReivi
 - As fontes variáveis vêm dos pacotes locais. As imagens OpenGraph mantêm suas fontes estáticas em `assets/fontes`.
 - A abertura desenha o logo só na primeira visita à página inicial por aba.
 - Toque, clique, roda do mouse ou tecla pulam a abertura. Menos movimento a desativa.
-- A cortina cobre a troca entre páginas internas. Ela não cobre filtros, âncoras nem envios de formulários.
+- A cortina cobre só a busca do diretório: o formulário de `BuscaDiretorio`, marcado com `data-cortina`, na inicial e no Explorar. Links, filtros e os outros formulários seguem a navegação nativa, sem animação.
+- Uma busca no próprio Explorar só muda os parâmetros. Por isso a cortina compara o endereço inteiro, caminho e parâmetros, para saber quando abrir. Repetir a mesma busca não aciona a cortina.
 - Na cortina, uma folha verde entra pela esquerda e cobre a tela. Um losango amarelo nasce no centro. Na abertura, a página nova aparece dentro de um recorte em losango que cresce, e a folha sai pela direita. As formas lembram a bandeira, mas não a reproduzem: sem círculo, estrelas ou lema.
 - O fim da transição da folha encerra a cortina. As durações ficam em `cortina.css` e somam cerca de 790 ms.
-- Links externos, downloads e cliques modificados mantêm a navegação nativa.
-- Regiões com `data-sem-cortina`, `inert` ou `aria-disabled="true"` preservam a navegação nativa dos links descendentes.
-- Conteúdo editável não aciona a cortina. Uma ilha com `contenteditable="false"` pode acionar a transição normalmente.
 - Escape e voltar liberam a cortina. Menos movimento desativa a transição.
 - O cortejo mantém suas figuras em SVG, com quatro técnicas e um controle de pausa.
 - `npm run cortejo:ciclos` executa `scripts/gerar-ciclos.mjs` e gera `src/components/cortejo/ciclos.css`.

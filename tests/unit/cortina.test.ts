@@ -1,57 +1,35 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { destinoDaCortina, proximaFaseCortina, type CliqueDaCortina } from "@/lib/cortina";
+import { destinoDaBusca, proximaFaseCortina, type BuscaDaCortina } from "@/lib/cortina";
 
-const clique = (mudanca: Partial<CliqueDaCortina> = {}): CliqueDaCortina => ({
-  atual: "https://exemplo.com/explorar?causa=escala-5x2",
-  href: "/empresas/padaria.florescer.exemplo",
-  botao: 0,
+const busca = (mudanca: Partial<BuscaDaCortina> = {}): BuscaDaCortina => ({
+  atual: "https://exemplo.com/",
+  acao: "https://exemplo.com/explorar",
+  campos: [["q", "padaria"], ["onde", "recife-pe"]],
   ...mudanca,
 });
 
-describe("destinoDaCortina", () => {
-  it("reconhece uma página interna e conserva sua busca e âncora", () => {
-    expect(destinoDaCortina(clique({ href: "/sobre?origem=guia#privacidade" }))).toEqual({
-      href: "/sobre?origem=guia#privacidade",
-      caminho: "/sobre",
-      tinta: "verde-escuro",
-    });
+describe("destinoDaBusca", () => {
+  it("leva a busca da inicial ao Explorar com os mesmos campos do formulário", () => {
+    expect(destinoDaBusca(busca())).toEqual({ href: "/explorar?q=padaria&onde=recife-pe" });
   });
 
-  it("usa a tinta do negócio sem consultar o banco", () => {
-    const destino = destinoDaCortina(clique());
-    expect(destino?.caminho).toBe("/empresas/padaria.florescer.exemplo");
-    expect(["azul", "rosa", "amarelo", "verde", "terracota"]).toContain(destino?.tinta);
+  it("mantém campos vazios, como o navegador faria", () => {
+    expect(destinoDaBusca(busca({ campos: [["q", "brechó"], ["onde", ""]] }))).toEqual({ href: "/explorar?q=brech%C3%B3&onde=" });
   });
 
-  it("aceita ativação de teclado como um clique primário", () => {
-    expect(destinoDaCortina(clique({ href: "/sobre#dono" }))).not.toBeNull();
+  it("cobre uma nova busca dentro do próprio Explorar", () => {
+    const destino = destinoDaBusca(busca({ atual: "https://exemplo.com/explorar?q=pao", campos: [["q", "bolo"]] }));
+    expect(destino).toEqual({ href: "/explorar?q=bolo" });
   });
 
   it.each([
-    { href: "/explorar?causa=antirracista" },
-    { href: "/explorar#resultados" },
-    { href: "/explorar/" },
-    { href: "#resultados" },
-    { href: "https://outro.com/sobre" },
-    { href: "mailto:oi@exemplo.com" },
-    { href: "tel:+5511999999999" },
-    { href: "javascript:alert(1)" },
-    { href: "/enviados/foto.jpg" },
-    { href: "/manual.pdf" },
-    { href: "/api/link?codigo=exemplo" },
-    { ctrl: true },
-    { meta: true },
-    { shift: true },
-    { alt: true },
-    { botao: 1 },
-    { alvo: "_blank" },
-    { alvo: "_parent" },
-    { download: true },
-    { prevenido: true },
-    { desativado: true },
-  ])("mantém a navegação nativa para %j", (mudanca) => {
-    expect(destinoDaCortina(clique(mudanca))).toBeNull();
+    { atual: "https://exemplo.com/explorar?q=padaria&onde=recife-pe" },
+    { acao: "https://outro.com/explorar" },
+    { acao: "javascript:alert(1)" },
+    { acao: "nao é url", atual: "também não" },
+  ])("mantém o envio nativo para %j", (mudanca) => {
+    expect(destinoDaBusca(busca(mudanca))).toBeNull();
   });
 });
 
