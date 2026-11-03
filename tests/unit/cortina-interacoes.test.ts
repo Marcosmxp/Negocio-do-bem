@@ -63,7 +63,7 @@ afterEach(() => {
 });
 
 function enviar(formulario: Formulario, prevenido = false) {
-  const evento = { target: formulario, submitter: null, defaultPrevented: prevenido, preventDefault: vi.fn() };
+  const evento = { target: formulario, submitter: null, defaultPrevented: prevenido, preventDefault: vi.fn(), stopPropagation: vi.fn() };
   ouvintes.submit(evento as unknown as Event);
   return evento;
 }
@@ -79,6 +79,17 @@ describe("cortina só na busca", () => {
     expect(navegar).not.toHaveBeenCalled();
     vi.runAllTimers();
     expect(navegar).toHaveBeenCalledExactlyOnceWith("/explorar?q=padaria&onde=");
+  });
+
+  it("segura o envio para o Form do Next não navegar antes de a cortina cobrir", () => {
+    // O <Form> do Next ignora preventDefault quando não tem onSubmit próprio.
+    const evento = enviar(busca());
+    expect(evento.stopPropagation).toHaveBeenCalledOnce();
+  });
+
+  it("não segura um envio que a cortina não cobre", () => {
+    const evento = enviar(new Formulario({ action: "https://exemplo.com/explorar" }));
+    expect(evento.stopPropagation).not.toHaveBeenCalled();
   });
 
   it("não escuta cliques em links: a navegação comum segue sem cortina", () => {

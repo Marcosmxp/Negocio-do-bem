@@ -54,6 +54,9 @@ export function CortinaDePagina() {
       const destino = destinoDaBusca({ atual: location.href, acao: formulario.action, campos });
       if (!destino) return;
       evento.preventDefault();
+      // O <Form> do Next ignora preventDefault quando não tem onSubmit próprio e
+      // navegaria antes de a cortina cobrir. A cortina assume esta navegação.
+      evento.stopPropagation();
       if (pendente.current) return;
       pendente.current = { ...destino, origem: `${location.pathname}${location.search}`, enviada: false };
       mudar("iniciar");
