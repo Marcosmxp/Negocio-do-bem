@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { afterAll, describe, expect, it } from "vitest";
 import { reservarEscrita } from "@/lib/antiabuso";
 import { db } from "@/lib/db";
@@ -33,6 +33,25 @@ describe("reserva atómica de operações de escrita (#104)", () => {
       reservarEscrita({ operacao: "depoimento", usuarioId: randomUUID(), negocioId, origem: null }),
     ));
     expect(resultados.filter(Boolean)).toHaveLength(60);
+  });
+
+  it("aplica a cota de origem confiável mesmo quando as contas são diferentes", async () => {
+    const origem = "203.0.113.155";
+    const negocioId = randomUUID();
+    const primeira = await reservarEscrita({
+      operacao: "denuncia", usuarioId: randomUUID(), negocioId, origem,
+    });
+    expect(primeira).toBe(true);
+    const chave = createHash("sha256")
+      .update(JSON.stringify(["ndb:escrita:v1", "denuncia", "origem", origem]))
+      .digest("hex");
+    await db.tentativaAcesso.update({ where: { chave }, data: { contagem: 200 } });
+    expect(await reservarEscrita({
+      operacao: "denuncia", usuarioId: randomUUID(), negocioId, origem,
+    })).toBe(false);
+    expect(await reservarEscrita({
+      operacao: "denuncia", usuarioId: randomUUID(), negocioId, origem: "198.51.100.9",
+    })).toBe(true);
   });
 
   it("sem IP confiável, não impõe uma cota comum a contas sem relação", async () => {
