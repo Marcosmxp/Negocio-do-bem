@@ -1,6 +1,6 @@
 import "server-only";
 import { PrismaPg } from "@prisma/adapter-pg";
-import { PrismaClient } from "@/generated/prisma/client";
+import { Prisma, PrismaClient } from "@/generated/prisma/client";
 
 export type { Prisma } from "@/generated/prisma/client";
 
@@ -65,3 +65,17 @@ export const db: PrismaClient = new Proxy({} as PrismaClient, {
     return { configurable: true, enumerable: true, writable: true, value: Reflect.get(db, propriedade) };
   },
 });
+
+/**
+ * Uma consulta prévia não protege contra dois inserts concorrentes.
+ * Restrito às criações de usuário e depoimento, cujas chaves únicas relevantes
+ * representam um cadastro/depoimento já existente. Outros erros continuam subindo.
+ */
+export async function semDuplicar<T>(escrita: Promise<T>): Promise<T | null> {
+  try {
+    return await escrita;
+  } catch (erro) {
+    if (erro instanceof Prisma.PrismaClientKnownRequestError && erro.code === "P2002") return null;
+    throw erro;
+  }
+}
