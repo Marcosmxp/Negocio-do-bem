@@ -6,6 +6,7 @@ import { verificarSenha } from "@/lib/auth/senha";
 import { caminhoSeguro, encerrarSessao, sessaoAtual } from "@/lib/auth/sessao";
 import {
   criptografarSegredoMfa,
+  configuracaoMfaValida,
   descriptografarSegredoMfa,
   gerarCodigosRecuperacao,
   gerarSegredoMfa,
@@ -68,7 +69,7 @@ export async function iniciarConfiguracaoMfa(_estado: EstadoMfa, dados: FormData
   const segredo = gerarSegredoMfa();
   await db.usuario.update({
     where: { id: sessao.usuarioId },
-    data: { mfaSegredoPendente: criptografarSegredoMfa(segredo) },
+    data: { mfaSegredoPendente: criptografarSegredoMfa(segredo), mfaPendenteCriadoEm: new Date() },
   });
   return { segredo };
 }
@@ -78,10 +79,18 @@ export async function confirmarConfiguracaoMfa(_estado: EstadoMfa, dados: FormDa
   const sessao = await contextoModerador();
   const pendente = await db.usuario.findUnique({
     where: { id: sessao.usuarioId },
-    select: { mfaSegredoPendente: true, mfaAtivadoEm: true },
+    select: { mfaSegredoPendente: true, mfaPendenteCriadoEm: true, mfaAtivadoEm: true },
   });
   if (!pendente?.mfaSegredoPendente || pendente.mfaAtivadoEm) {
     return { erro: "Inicie a configuração novamente." };
+  }
+  if (!configuracaoMfaValida(pendente.mfaPendenteCriadoEm)) {
+    // Não elimina uma chave nova iniciada em paralelo noutra sessão.
+    await db.usuario.updateMany({
+      where: { id: sessao.usuarioId, mfaAtivadoEm: null, mfaSegredoPendente: pendente.mfaSegredoPendente },
+      data: { mfaSegredoPendente: null, mfaPendenteCriadoEm: null },
+    });
+    return { erro: "A configuração expirou. Gere uma nova chave de autenticação." };
   }
   const codigo = dados.get("codigo");
   const limite = await limitarTentativa(sessao.usuario.email, sessao.usuarioId);
@@ -96,9 +105,15 @@ export async function confirmarConfiguracaoMfa(_estado: EstadoMfa, dados: FormDa
   const agora = new Date();
   const configurado = await db.$transaction(async (tx) => {
     const { count } = await tx.usuario.updateMany({
-      where: { id: sessao.usuarioId, mfaAtivadoEm: null, mfaSegredoPendente: pendente.mfaSegredoPendente },
+      where: {
+        id: sessao.usuarioId,
+        mfaAtivadoEm: null,
+        mfaSegredoPendente: pendente.mfaSegredoPendente,
+        mfaPendenteCriadoEm: { gt: new Date(agora.getTime() - 10 * 60_000), lte: agora },
+      },
       data: {
         mfaSegredo: pendente.mfaSegredoPendente,
+        mfaPendenteCriadoEm: null,
         mfaSegredoPendente: null,
         mfaAtivadoEm: agora,
         mfaUltimoPeriodo: periodo,
