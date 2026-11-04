@@ -97,13 +97,6 @@ export function Cortejo({ personagens, tecnicas, className = "" }: Props) {
         <div className="cortejo-camada cortejo-rejunte" aria-hidden="true" />
       </div>
       <div className="cortejo-controle">
-        <ul className="cortejo-tecnicas" aria-hidden="true">
-          {lista.map((nome) => (
-            <li key={nome} data-atual={nome === tecnica ? "" : undefined}>
-              {nome}
-            </li>
-          ))}
-        </ul>
         {/* Sem JavaScript as figuras já ficam paradas e o botão não teria efeito. */}
         <ControleMovimento oculto={!montado} />
       </div>

@@ -725,7 +725,8 @@ Erros que podem ser mostrados para a pessoa usam uma classe própria (`ErroReivi
 - Na cortina, uma folha verde entra pela esquerda e cobre a tela. Um losango amarelo nasce no centro. Na abertura, a página nova aparece dentro de um recorte em losango que cresce, e a folha sai pela direita. As formas lembram a bandeira, mas não a reproduzem: sem círculo, estrelas ou lema.
 - O fim da transição da folha encerra a cortina. As durações ficam em `cortina.css` e somam cerca de 790 ms.
 - Escape e voltar liberam a cortina. Menos movimento desativa a transição.
-- O cortejo mantém suas figuras em SVG, com quatro técnicas e um controle de pausa.
+- O cortejo mantém suas figuras em SVG, com quatro técnicas e um controle de pausa. As etiquetas com o nome da técnica saíram: chamavam atenção para a troca, e não para os negócios.
+- Os números do diretório (#278) entram numa faixa compacta abaixo do cortejo. Comparamos três topos: só a animação, só os números grandes no lugar dela, e os dois. Só a animação não mostrava que o diretório é grande e de verdade. Só os números deixavam a inicial com cara de diretório qualquer. Com os dois, o cortejo abre a página e os números confirmam logo abaixo. Enquanto os números carregam, a faixa aparece vazia com a mesma altura, para a busca não pular.
 - `npm run cortejo:ciclos` executa `scripts/gerar-ciclos.mjs` e gera `src/components/cortejo/ciclos.css`.
 - Não edite os ciclos gerados. As medidas e os pivôs estão em `src/components/cortejo/RIG.md`.
 

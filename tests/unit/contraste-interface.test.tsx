@@ -37,6 +37,12 @@ describe("contraste dos controles", () => {
     expect(inicio).toMatch(/\.inicio-busca button:focus-visible,[\s\S]*?\.inicio-cortejo \.inicio-botaoConvite:focus-visible\s*\{\s*outline-color: var\(--color-azul-texto\)/);
     for (const paleta of [claro, escuro]) for (const fundo of ["papel", "superficie"]) expect(contraste(paleta["azul-texto"], paleta[fundo])).toBeGreaterThanOrEqual(3);
   });
+  it("os números da inicial contrastam com a superfície da faixa nos dois temas", () => {
+    for (const tinta of ["verde", "terracota", "azul", "rosa"]) {
+      expect(inicio).toContain(`.inicio-numero[data-tinta="${tinta}"] dd { color: var(--color-${tinta}-texto); }`);
+      for (const paleta of [claro, escuro]) expect(contraste(paleta[`${tinta}-texto`], paleta.superficie)).toBeGreaterThanOrEqual(4.5);
+    }
+  });
   it("o seletor de estilo do editor usa a borda funcional", () => {
     expect(editor.match(/<select[\s\S]*?<\/select>/)![0]).toContain("border-borda-controle");
   });

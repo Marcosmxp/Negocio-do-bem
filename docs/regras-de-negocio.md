@@ -806,7 +806,14 @@ Código: filtros e "Onde?" em `src/lib/diretorio.ts`, consultas em `src/lib/cons
 
 ### Página inicial
 
-- **O cortejo animado** apresenta quatro tipos de negócio, com suas contagens e links para as páginas de tipo. Ele tem controle de pausa e respeita a preferência por menos movimento.
+- **O cortejo animado** apresenta quatro tipos de negócio, com suas contagens e links para as páginas de tipo. Ele tem controle de pausa e respeita a preferência por menos movimento. As figuras trocam de técnica sem mostrar o nome dela.
+- **Os números do diretório** ficam numa faixa entre o cortejo e a busca:
+  - negócios do bem no diretório;
+  - cidades, com o número de estados;
+  - indicados pela comunidade: os negócios ainda sem dono (status "indicada");
+  - administrados pelo próprio dono: os perfis assumidos (status "verificada").
+
+  Indicados e administrados somam o total. Os números contam só os negócios do diretório, como os outros números do site. Sem nenhum negócio no diretório, a faixa não aparece.
 - **A busca** tem dois campos, "O que você procura?" e "Onde?", e leva ao diretório.
 - **"Quem faz o bem"** mostra até quatro negócios do diretório com foto do site, dos mais recentes para os mais antigos. Sem história, mostra o motivo da indicação e quem indicou. Sem motivo, mostra o resumo. Sem negócios com foto, a seção não aparece.
 - **As três faixas de causas** mostram todas as causas, por grupo, com links para suas páginas. Cada faixa para com o mouse em cima, e o clique em qualquer causa visível abre a página dela, inclusive na cópia que fecha o laço. Com o foco do teclado, a faixa volta ao começo e esconde a cópia. A cópia fica fora do Tab e do leitor de tela.

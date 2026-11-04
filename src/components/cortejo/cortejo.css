@@ -450,7 +450,7 @@
 }
 :where([data-tema="escuro"]) .cortejo.xilogravura .cortejo-papel { opacity: 1; }
 
-/* ------------------------------------------------------------------ controle de pausa e legenda */
+/* ------------------------------------------------------------------ controle de pausa */
 
 .cortejo-controle {
   position: relative;
@@ -458,35 +458,10 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 0.5rem 1rem;
   max-width: 76rem;
   margin: 0.75rem auto 0;
-}
-
-.cortejo-tecnicas {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.25rem;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  color: var(--c-suave);
-  font-size: 0.8125rem;
-}
-.cortejo-tecnicas li {
-  padding: 0.2rem 0.6rem;
-  border-radius: 999px;
-  transition:
-    background-color 300ms cubic-bezier(0.16, 1, 0.3, 1),
-    color 300ms cubic-bezier(0.16, 1, 0.3, 1);
-}
-.cortejo-tecnicas li[data-atual] {
-  background: var(--c-tinta);
-  color: var(--c-papel);
-}
-@media (max-width: 40rem) {
-  .cortejo-tecnicas li:not([data-atual]) { display: none; }
 }
 
 .cortejo-pausa {
@@ -515,7 +490,6 @@
 
 @media (prefers-reduced-motion: reduce) {
   .cortejo-camada,
-  .cortejo-etiqueta,
-  .cortejo-tecnicas li { transition: none; }
+  .cortejo-etiqueta { transition: none; }
   .cortejo-pausa { display: none; }
 }

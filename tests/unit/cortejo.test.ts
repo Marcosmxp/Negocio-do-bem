@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { CAUSAS, GRUPOS } from "@/lib/causas";
-import { FAIXAS_DE_CAUSAS, recomendacaoPublica, TINTAS, tintaDoNegocio } from "@/lib/cortejo";
+import { FAIXAS_DE_CAUSAS, numerosDaInicial, recomendacaoPublica, TINTAS, tintaDoNegocio } from "@/lib/cortejo";
 
 describe("tintaDoNegocio", () => {
   it("dá sempre a mesma tinta para o mesmo @", () => {
@@ -82,5 +82,38 @@ describe("recomendacaoPublica", () => {
       motivo: "Pão de fermentação natural e gente muito boa.",
       indicadoPor: null,
     });
+  });
+});
+
+describe("numerosDaInicial", () => {
+  it("mostra o total, as cidades, os indicados e os administrados pelo dono", () => {
+    const numeros = numerosDaInicial({ total: 1046, verificados: 702, cidades: 276, estados: 25 });
+    expect(numeros).toEqual([
+      { valor: "1.046", rotulo: "negócios do bem no diretório", tinta: "verde" },
+      { valor: "276", rotulo: "cidades, em 25 estados", tinta: "terracota" },
+      { valor: "344", rotulo: "indicados pela comunidade", tinta: "azul" },
+      { valor: "702", rotulo: "administrados pelo próprio dono", tinta: "rosa" },
+    ]);
+  });
+
+  it("indicados e administrados somam o total", () => {
+    const resumo = { total: 37, verificados: 12, cidades: 9, estados: 4 };
+    const [, , indicados, administrados] = numerosDaInicial(resumo);
+    expect(Number(indicados!.valor) + Number(administrados!.valor)).toBe(resumo.total);
+  });
+
+  it("usa o singular quando o número é 1", () => {
+    const numeros = numerosDaInicial({ total: 2, verificados: 1, cidades: 1, estados: 1 });
+    expect(numeros.map((n) => n.rotulo)).toEqual([
+      "negócios do bem no diretório",
+      "cidade, em 1 estado",
+      "indicado pela comunidade",
+      "administrado pelo próprio dono",
+    ]);
+    expect(numerosDaInicial({ total: 1, verificados: 0, cidades: 1, estados: 1 })[0]!.rotulo).toBe("negócio do bem no diretório");
+  });
+
+  it("sem negócios no diretório, a faixa não aparece", () => {
+    expect(numerosDaInicial({ total: 0, verificados: 0, cidades: 0, estados: 0 })).toEqual([]);
   });
 });

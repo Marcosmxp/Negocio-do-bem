@@ -6,7 +6,7 @@ import { Cortejo } from "@/components/cortejo/Cortejo";
 import { personagensDoCortejo } from "@/components/cortejo/dados";
 import { FaixaEmbaixadores } from "@/components/FaixaEmbaixadores";
 import { JsonLd } from "@/components/JsonLd";
-import { FAIXAS_DE_CAUSAS } from "@/lib/cortejo";
+import { FAIXAS_DE_CAUSAS, numerosDaInicial, type NumeroDaInicial } from "@/lib/cortejo";
 import { listarCidades, recentesComFoto, resumoDoDiretorio } from "@/lib/consultas";
 import { DESCRICAO_DO_SITE, jsonLdDoSite, metadadosDaPagina } from "@/lib/seo";
 import { CortejoInicial } from "./inicio/CortejoInicial";
@@ -16,6 +16,10 @@ import "./inicio/inicio.css";
 export const metadata: Metadata = metadadosDaPagina({ descricao: DESCRICAO_DO_SITE, caminho: "/", imagemPropria: true });
 
 const TECNICAS = ["pintura", "xilogravura", "barro", "azulejo"];
+
+// Só ocupam o lugar da faixa enquanto os números chegam: a caixa aparece vazia
+// com a mesma altura, e a busca abaixo dela não pula.
+const NUMEROS_DE_ESPERA = numerosDaInicial({ total: 1000, verificados: 500, cidades: 100, estados: 10 });
 
 export default function Inicio() {
   return (
@@ -40,6 +44,10 @@ export default function Inicio() {
               <CortejoComNegocios />
             </Suspense>
           </div>
+
+          <Suspense fallback={<FaixaDeNumeros numeros={NUMEROS_DE_ESPERA} carregando />}>
+            <NumerosDoDiretorio />
+          </Suspense>
 
           <div className="inicio-busca" id="encontrar">
             <Suspense fallback={<BuscaDiretorio cidades={[]} />}>
@@ -109,6 +117,26 @@ export default function Inicio() {
 async function CortejoComNegocios() {
   const { porCategoria } = await resumoDoDiretorio();
   return <Cortejo personagens={personagensDoCortejo(porCategoria)} tecnicas={TECNICAS} />;
+}
+
+/** O tamanho do diretório, logo abaixo do cortejo. Sem negócios, não aparece. */
+async function NumerosDoDiretorio() {
+  const numeros = numerosDaInicial(await resumoDoDiretorio());
+  if (numeros.length === 0) return null;
+  return <FaixaDeNumeros numeros={numeros} />;
+}
+
+function FaixaDeNumeros({ numeros, carregando = false }: { numeros: NumeroDaInicial[]; carregando?: boolean }) {
+  return (
+    <dl className="inicio-numeros" aria-hidden={carregando || undefined} data-carregando={carregando || undefined}>
+      {numeros.map((numero) => (
+        <div key={numero.tinta} className="inicio-numero" data-tinta={numero.tinta}>
+          <dt>{numero.rotulo}</dt>
+          <dd>{numero.valor}</dd>
+        </div>
+      ))}
+    </dl>
+  );
 }
 
 async function BuscaComCidades() {

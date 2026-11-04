@@ -1,5 +1,5 @@
-// Dados do "cortejo do bem": a tinta de cada negócio, as faixas das causas e a
-// regra que decide quando a indicação aparece fora do perfil.
+// Dados do "cortejo do bem": a tinta de cada negócio, as faixas das causas, os
+// números do topo e a regra que decide quando a indicação aparece fora do perfil.
 // Sem banco, para valer no servidor, no navegador e nos testes.
 // A consulta dos negócios recentes fica em src/lib/consultas.ts (recentesComFoto).
 
@@ -44,6 +44,34 @@ export const FAIXAS_DE_CAUSAS: FaixaDeCausas[] = (Object.keys(GRUPOS) as GrupoCa
     href: hrefCausa(c.slug),
   })),
 }));
+
+export type NumeroDaInicial = { valor: string; rotulo: string; tinta: Tinta };
+
+/**
+ * Os quatro números da faixa abaixo do cortejo, a partir de `resumoDoDiretorio`
+ * (src/lib/consultas.ts). Indicados são os negócios ainda sem dono (status
+ * "indicada"); somados aos administrados pelo dono ("verificada"), dão o total.
+ * Sem nenhum negócio no diretório, a lista vem vazia e a faixa não aparece.
+ */
+export function numerosDaInicial(resumo: { total: number; verificados: number; cidades: number; estados: number }): NumeroDaInicial[] {
+  if (resumo.total === 0) return [];
+  const indicados = resumo.total - resumo.verificados;
+  const n = (valor: number) => valor.toLocaleString("pt-BR");
+  return [
+    { valor: n(resumo.total), rotulo: resumo.total === 1 ? "negócio do bem no diretório" : "negócios do bem no diretório", tinta: "verde" },
+    {
+      valor: n(resumo.cidades),
+      rotulo: `${resumo.cidades === 1 ? "cidade" : "cidades"}, em ${n(resumo.estados)} ${resumo.estados === 1 ? "estado" : "estados"}`,
+      tinta: "terracota",
+    },
+    { valor: n(indicados), rotulo: indicados === 1 ? "indicado pela comunidade" : "indicados pela comunidade", tinta: "azul" },
+    {
+      valor: n(resumo.verificados),
+      rotulo: resumo.verificados === 1 ? "administrado pelo próprio dono" : "administrados pelo próprio dono",
+      tinta: "rosa",
+    },
+  ];
+}
 
 export type Recomendacao = { motivo: string; indicadoPor: string | null };
 

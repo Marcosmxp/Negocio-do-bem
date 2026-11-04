@@ -84,4 +84,11 @@ describe("Cortejo no servidor", () => {
     expect(botao).toMatch(/\shidden(=""|\s|>)/);
     expect(html).toContain("Pausar animações");
   });
+
+  it("troca de técnica sem mostrar o nome dela", () => {
+    // As etiquetas "pintura", "xilogravura", "barro" e "azulejo" saíram do controle (#278).
+    expect(html).not.toContain("cortejo-tecnicas");
+    const controle = html.slice(html.indexOf('class="cortejo-controle"'));
+    for (const tecnica of ["pintura", "xilogravura", "barro", "azulejo"]) expect(controle).not.toContain(`>${tecnica}<`);
+  });
 });
