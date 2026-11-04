@@ -4,6 +4,14 @@ import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes, 
 // RFC 6238. Segredos protegidos em repouso por AES-256-GCM; a chave NÃO fica no banco.
 const ALFABETO = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
 const PERIODO_SEGUNDOS = 30;
+const PRAZO_CONFIGURACAO_MFA_MS = 10 * 60_000;
+
+/** O segredo pendente só pode ser confirmado na janela de configuração. */
+export function configuracaoMfaValida(iniciadaEm: Date | null, agora = new Date()): boolean {
+  if (!iniciadaEm || !Number.isFinite(iniciadaEm.getTime())) return false;
+  const decorrido = agora.getTime() - iniciadaEm.getTime();
+  return decorrido >= 0 && decorrido < PRAZO_CONFIGURACAO_MFA_MS;
+}
 
 function chaveDeCriptografia(): Buffer {
   const valor = process.env.MFA_ENCRYPTION_KEY;
