@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   criptografarSegredoMfa,
+  configuracaoMfaValida,
   descriptografarSegredoMfa,
   gerarCodigosRecuperacao,
   gerarSegredoMfa,
@@ -9,6 +10,13 @@ import {
 } from "@/lib/auth/mfa";
 
 describe("MFA RFC 6238 e segredos", () => {
+  it("rejeita configurações pendentes com mais de dez minutos ou data futura", () => {
+    const agora = new Date("2026-11-04T12:00:00.000Z");
+    expect(configuracaoMfaValida(null, agora)).toBe(false);
+    expect(configuracaoMfaValida(new Date(agora.getTime() - 9 * 60_000), agora)).toBe(true);
+    expect(configuracaoMfaValida(new Date(agora.getTime() - 10 * 60_000), agora)).toBe(false);
+    expect(configuracaoMfaValida(new Date(agora.getTime() + 1_000), agora)).toBe(false);
+  });
   it("valida o vetor RFC 6238 de 6 dígitos", () => {
     const segredo = "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ";
     expect(validarCodigoMfa(segredo, "287082", 59_000)).toBe(1);
