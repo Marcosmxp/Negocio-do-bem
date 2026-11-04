@@ -240,7 +240,7 @@ Validação: `src/acoes/empresas.ts` e `src/lib/formulario.ts`.
 | Site | Não | Até 200 caracteres. Sem `http`, ganha `https://`. Precisa ter um ponto no domínio. |
 | WhatsApp | Não | Número brasileiro com DDD (ver abaixo). |
 | E-mail de contato | Não | E-mail válido, até 200 caracteres, guardado em minúsculas. |
-| Link do mapa | Não | Até 1.000 caracteres. Só links do Google Maps (`maps.app.goo.gl`, `maps.google.com`, `google.com/maps`, `goo.gl/maps`, também com `.br`) ou do Apple Maps (`maps.apple.com`, `maps.apple`). Sem `http`, ganha `https://`, e `http` vira `https`. |
+| Link do mapa | Não | Até 1.000 caracteres. Só links do Google Maps (`maps.app.goo.gl`, `maps.google.com`, `google.com/maps`, `goo.gl/maps`, também com `.br`) ou do Apple Maps (`maps.apple.com`, `maps.apple`). Sem `http`, ganha `https://`, e `http` vira `https`. | A validação também limita o endereço normalizado a 1.000 caracteres, exige o segmento `/maps` exato (ou `/maps/`) nas URLs do Google e recusa credenciais e portas não padrão.
 | Causas | Não | Qualquer combinação da lista oficial. Slugs desconhecidos são descartados. |
 | História | Não | Markdown, até 20 mil caracteres (ver [seção 8](#8-história-do-negócio)). |
 | Foto | Não | Ver [seção 9](#9-fotos). |

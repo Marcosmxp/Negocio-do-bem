@@ -37,7 +37,7 @@ function ehLinkDeMapa(url: URL): boolean {
   const host = url.hostname.toLowerCase().replace(/^www\./, "");
   if (["maps.app.goo.gl", "maps.apple.com", "maps.apple"].includes(host)) return true;
   if (/^maps\.google\.com(\.br)?$/.test(host)) return true;
-  return (/^google\.com(\.br)?$/.test(host) || host === "goo.gl") && url.pathname.startsWith("/maps");
+  return (/^google\.com(\.br)?$/.test(host) || host === "goo.gl") && (url.pathname === "/maps" || url.pathname.startsWith("/maps/"));
 }
 
 /** Link do mapa opcional: aceita links do Google Maps e do Apple Maps e guarda com https, ou null se vazio. */
@@ -49,9 +49,16 @@ export const campoMapa = z
     if (!valor) return null;
     try {
       const url = new URL(/^https?:\/\//i.test(valor) ? valor : `https://${valor}`);
+      // Links com credenciais ou portas fora do padrão não representam um mapa público normal.
+      if (url.username || url.password || url.port) throw new Error("URL de mapa inválida.");
       if (ehLinkDeMapa(url)) {
         url.protocol = "https:";
-        return url.toString();
+        const normalizado = url.toString();
+        if (normalizado.length > 1000) {
+          ctx.addIssue({ code: "custom", message: "Link muito longo." });
+          return z.NEVER;
+        }
+        return normalizado;
       }
     } catch {
       // cai na mensagem abaixo
