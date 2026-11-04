@@ -32,6 +32,7 @@ model Usuario {
   // MFA é obrigatório para exercer o papel de moderador.
   mfaSegredo String?
   mfaSegredoPendente String?
+  mfaPendenteCriadoEm DateTime?
   mfaAtivadoEm DateTime?
   mfaUltimoPeriodo Int?
   codigosRecuperacao MfaCodigoRecuperacao[]
