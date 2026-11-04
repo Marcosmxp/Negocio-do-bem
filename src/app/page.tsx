@@ -3,13 +3,12 @@ import Link from "next/link";
 import { Suspense, type CSSProperties } from "react";
 import { BuscaDiretorio } from "@/components/BuscaDiretorio";
 import { Cortejo } from "@/components/cortejo/Cortejo";
-import { personagensDoCortejo } from "@/components/cortejo/dados";
+import { PERSONAGENS_DO_CORTEJO } from "@/components/cortejo/dados";
 import { FaixaEmbaixadores } from "@/components/FaixaEmbaixadores";
 import { JsonLd } from "@/components/JsonLd";
 import { FAIXAS_DE_CAUSAS, numerosDaInicial, type NumeroDaInicial } from "@/lib/cortejo";
 import { listarCidades, recentesComFoto, resumoDoDiretorio } from "@/lib/consultas";
 import { DESCRICAO_DO_SITE, jsonLdDoSite, metadadosDaPagina } from "@/lib/seo";
-import { CortejoInicial } from "./inicio/CortejoInicial";
 import { EntradaAnimada, Laco, SeloDoConvite } from "./inicio/MovimentoInicio";
 import "./inicio/inicio.css";
 
@@ -40,9 +39,7 @@ export default function Inicio() {
           </div>
 
           <div className="inicio-palco">
-            <Suspense fallback={<CortejoInicial />}>
-              <CortejoComNegocios />
-            </Suspense>
+            <Cortejo personagens={PERSONAGENS_DO_CORTEJO} tecnicas={TECNICAS} />
           </div>
 
           <Suspense fallback={<FaixaDeNumeros numeros={NUMEROS_DE_ESPERA} carregando />}>
@@ -112,11 +109,6 @@ export default function Inicio() {
       </Laco>
     </div>
   );
-}
-
-async function CortejoComNegocios() {
-  const { porCategoria } = await resumoDoDiretorio();
-  return <Cortejo personagens={personagensDoCortejo(porCategoria)} tecnicas={TECNICAS} />;
 }
 
 /** O tamanho do diretório, logo abaixo do cortejo. Sem negócios, não aparece. */

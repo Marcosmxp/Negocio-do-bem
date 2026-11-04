@@ -133,11 +133,6 @@
   animation-play-state: running;
 }
 
-/* Passar o mouse ou focar uma pessoa para só ela. */
-.cortejo[data-estado="rodando"] .cortejo-pessoa:is(:hover, :focus-visible) .figura [class^="r-"] {
-  animation-play-state: paused;
-}
-
 @media (prefers-reduced-motion: reduce) {
   .cortejo .figura [class^="r-"],
   .figura [class^="r-"] {
@@ -328,77 +323,15 @@
   width: auto;
 }
 
+/* As figuras são desenho: não levam a lugar nenhum e ficam fora do leitor de tela. */
 .cortejo-pessoa {
   position: relative;
   display: block;
-  border-radius: 1.5rem;
-  color: inherit;
-  text-decoration: none;
-  -webkit-tap-highlight-color: transparent;
-}
-.cortejo-pessoa .figura {
-  pointer-events: none;
-}
-.cortejo-pessoa .figura :is(path, ellipse, circle, rect, text) {
-  pointer-events: visiblePainted;
-}
-.cortejo-pessoa .figura .t-chao {
-  pointer-events: none;
-}
-.cortejo-pessoa:focus-visible {
-  outline: 3px solid var(--c-tinta);
-  outline-offset: 4px;
 }
 
 .cortejo-cachorro {
   margin-left: calc(var(--h) * -0.24);
   pointer-events: none;
-}
-
-/* A etiqueta: categoria e contagem, numa pílula inclinada, ao passar o mouse ou focar. */
-.cortejo-etiqueta {
-  position: absolute;
-  bottom: calc(100% - 1.4rem);
-  left: 50%;
-  z-index: 3;
-  display: grid;
-  gap: 0.05rem;
-  width: max-content;
-  max-width: 11rem;
-  padding: 0.45rem 0.85rem 0.5rem;
-  border-radius: 999px;
-  background: var(--c-tinta);
-  color: var(--c-papel);
-  font-size: 0.8125rem;
-  line-height: 1.15;
-  text-align: center;
-  opacity: 0;
-  transform: translate(-50%, 0.4rem) rotate(-4deg);
-  transition:
-    opacity 180ms cubic-bezier(0.16, 1, 0.3, 1),
-    transform 260ms cubic-bezier(0.16, 1, 0.3, 1);
-  pointer-events: none;
-}
-.cortejo-etiqueta-rotulo { font-weight: 700; }
-.cortejo-etiqueta-total { opacity: 0.8; font-variant-numeric: tabular-nums; }
-.cortejo-vaga:first-child .cortejo-etiqueta {
-  left: 0;
-  transform: translate(0, 0.4rem) rotate(-4deg);
-}
-.cortejo-vaga:last-child .cortejo-etiqueta {
-  left: auto;
-  right: 0;
-  transform: translate(0, 0.4rem) rotate(3deg);
-}
-.cortejo-pessoa:is(:hover, :focus-visible) .cortejo-etiqueta {
-  opacity: 1;
-  transform: translate(-50%, 0) rotate(-4deg);
-}
-.cortejo-vaga:first-child .cortejo-pessoa:is(:hover, :focus-visible) .cortejo-etiqueta {
-  transform: translate(0, 0) rotate(-4deg);
-}
-.cortejo-vaga:last-child .cortejo-pessoa:is(:hover, :focus-visible) .cortejo-etiqueta {
-  transform: translate(0, 0) rotate(3deg);
 }
 
 /* ------------------------------------------------------------------ fundos e texturas das técnicas */
@@ -489,7 +422,6 @@
 .cortejo-pausa svg { width: 0.875rem; height: 0.875rem; }
 
 @media (prefers-reduced-motion: reduce) {
-  .cortejo-camada,
-  .cortejo-etiqueta { transition: none; }
+  .cortejo-camada { transition: none; }
   .cortejo-pausa { display: none; }
 }

@@ -1,14 +1,4 @@
-// Textos do cortejo: o nome dos links, a contagem e o desenho das palavras nas placas.
-
-/** Nome acessível do link de uma pessoa: "Ver negócios de café e padaria". */
-export function rotuloDoLink(categoria: string): string {
-  return `Ver negócios de ${categoria.charAt(0).toLocaleLowerCase("pt-BR")}${categoria.slice(1)}`;
-}
-
-export function textoDoTotal(total: number): string {
-  if (total <= 0) return "Nenhum negócio ainda";
-  return `${total.toLocaleString("pt-BR")} ${total === 1 ? "negócio" : "negócios"}`;
-}
+// Textos do cortejo: o desenho das palavras nas placas.
 
 /** As linhas da placa, em maiúsculas. Uma frase de mais de cinco letras quebra nos espaços. */
 export function linhasDaPlaca(placa: string): string[] {

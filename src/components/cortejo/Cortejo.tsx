@@ -1,16 +1,15 @@
 "use client";
 
 // O palco do cortejo: as pessoas andam no lugar com as placas e o desenho troca de técnica.
-// Cada pessoa é um link para o seu tipo de negócio. As regras das figuras estão em RIG.md.
+// As figuras são desenho: não são links e ficam fora do leitor de tela, porque as placas
+// repetem o título da página. As regras das figuras estão em RIG.md.
 
-import Link from "next/link";
 import { useEffect, useId, useRef, useState, useSyncExternalStore, type CSSProperties } from "react";
 import { ControleMovimento } from "./ControleMovimento";
 import type { PersonagemDoCortejo, PessoaDoCortejo } from "./dados";
 import { estadoDoPalco } from "./estado";
 import { useAbaOculta, useMovimentoPausado, useMovimentoReduzido } from "./movimento";
 import { PERSONAGENS } from "./personagens";
-import { rotuloDoLink, textoDoTotal } from "./rotulos";
 import { filtrarTecnicas, tecnicaNoTempo, tempoAteATroca } from "./tecnicas";
 import "./cortejo.css";
 
@@ -19,7 +18,7 @@ const FASES = ["-0.1s", "-0.52s", "-0.9s", "-0.31s"];
 const FASE_DO_CARAMELO = "-0.17s";
 
 type Props = {
-  personagens: PersonagemDoCortejo[];
+  personagens: readonly PersonagemDoCortejo[];
   tecnicas: readonly string[];
   className?: string;
 };
@@ -65,26 +64,15 @@ export function Cortejo({ personagens, tecnicas, className = "" }: Props) {
       <div className="cortejo-palco">
         <div className="cortejo-camada cortejo-azulejos" aria-hidden="true" />
         <div className="cortejo-camada cortejo-papel" aria-hidden="true" />
-        <ul className="cortejo-fila">
+        <ul className="cortejo-fila" aria-hidden="true">
           {pessoas.map((pessoa, i) => {
             const { Figura } = PERSONAGENS[pessoa.id];
-            const idDaEtiqueta = `${p}-etiqueta-${pessoa.id}`;
             const ultima = i === pessoas.length - 1;
             return (
               <li key={pessoa.id} className="cortejo-vaga" style={{ "--fase": FASES[i % FASES.length] } as CSSProperties}>
-                <Link
-                  href={pessoa.href}
-                  className="cortejo-pessoa"
-                  aria-label={rotuloDoLink(pessoa.rotulo)}
-                  aria-describedby={idDaEtiqueta}
-                >
+                <div className="cortejo-pessoa">
                   <Figura placa={pessoa.placa} />
-                  <span className="cortejo-etiqueta" id={idDaEtiqueta}>
-                    <span className="cortejo-etiqueta-rotulo">{pessoa.rotulo}</span>
-                    <span className="sr-only">: </span>
-                    <span className="cortejo-etiqueta-total">{textoDoTotal(pessoa.total)}</span>
-                  </span>
-                </Link>
+                </div>
                 {ultima && temCaramelo && (
                   <div className="cortejo-cachorro" aria-hidden="true" style={{ "--fase": FASE_DO_CARAMELO } as CSSProperties}>
                     <Caramelo />

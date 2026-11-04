@@ -5,13 +5,12 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { Cortejo } from "@/components/cortejo/Cortejo";
-import { CortejoInicial } from "@/app/inicio/CortejoInicial";
-import { personagensDoCortejo } from "@/components/cortejo/dados";
+import { PERSONAGENS_DO_CORTEJO } from "@/components/cortejo/dados";
 
 // O HTML que o servidor manda: o que aparece sem JavaScript e o que o leitor de tela lê.
 const html = renderToStaticMarkup(
   createElement(Cortejo, {
-    personagens: personagensDoCortejo({ "Café e padaria": 12, "Moda e acessórios": 1, Saúde: 0, "Mercado e empório": 7 }),
+    personagens: PERSONAGENS_DO_CORTEJO,
     tecnicas: ["pintura", "xilogravura", "barro", "azulejo"],
   }),
 );
@@ -28,48 +27,17 @@ describe("ciclos gerados", () => {
   });
 });
 
-describe("Cortejo antes dos dados", () => {
-  it("leva às páginas rastreáveis de tipo sem inventar contagens", () => {
-    const inicial = renderToStaticMarkup(createElement(CortejoInicial));
-    const destinos = [...inicial.matchAll(/<a\b[^>]*href="([^"]+)"/g)].map((m) => m[1]);
-    expect(destinos).toEqual([
-      "/tipos/cafe-e-padaria",
-      "/tipos/moda-e-acessorios",
-      "/tipos/saude",
-      "/tipos/mercado-e-emporio",
-    ]);
-    expect(inicial).not.toContain("Nenhum negócio ainda");
-    expect(inicial).not.toContain("0 negócios");
-  });
-});
-
 describe("Cortejo no servidor", () => {
-  it("cada pessoa é um link com o nome acessível do seu tipo de negócio", () => {
-    const rotulos = links().map((tag) => tag.match(/aria-label="([^"]+)"/)?.[1]);
-    expect(rotulos).toEqual([
-      "Ver negócios de café e padaria",
-      "Ver negócios de moda e acessórios",
-      "Ver negócios de saúde",
-      "Ver negócios de mercado e empório",
-    ]);
+  it("as figuras não levam a nenhuma categoria nem mostram contagem", () => {
+    // A ligação entre a figura e a categoria era arbitrária (#278).
+    expect(links()).toEqual([]);
+    expect(html).not.toContain("/tipos/");
+    expect(html).not.toContain("cortejo-etiqueta");
+    expect(html).not.toMatch(/\d+ negócios?</);
   });
 
-  it("o link descreve a categoria e a contagem com um texto que existe na página", () => {
-    for (const tag of links()) {
-      const alvo = tag.match(/aria-describedby="([^"]+)"/)?.[1];
-      expect(alvo).toBeTruthy();
-      expect(html).toContain(`id="${alvo}"`);
-    }
-    expect(html).toMatch(/Café e padaria<\/span><span class="sr-only">: <\/span><span[^>]*>12 negócios</);
-    expect(html).toContain("1 negócio<");
-    expect(html).toContain("Nenhum negócio ainda");
-  });
-
-  it("o caramelo fica fora dos links e da árvore de acessibilidade", () => {
-    const inicio = html.indexOf("figura-caramelo");
-    const antes = html.slice(0, inicio);
-    expect(antes.lastIndexOf("<a ")).toBeLessThan(antes.lastIndexOf("</a>"));
-    expect(antes.slice(antes.lastIndexOf("<div")).match(/aria-hidden="true"/)).toBeTruthy();
+  it("o palco fica fora do leitor de tela, porque as placas repetem o título", () => {
+    expect(html).toMatch(/<ul class="cortejo-fila" aria-hidden="true">/);
   });
 
   it("começa parado, na primeira técnica, até o JavaScript assumir", () => {

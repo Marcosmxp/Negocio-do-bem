@@ -726,6 +726,7 @@ Erros que podem ser mostrados para a pessoa usam uma classe própria (`ErroReivi
 - O fim da transição da folha encerra a cortina. As durações ficam em `cortina.css` e somam cerca de 790 ms.
 - Escape e voltar liberam a cortina. Menos movimento desativa a transição.
 - O cortejo mantém suas figuras em SVG, com quatro técnicas e um controle de pausa. As etiquetas com o nome da técnica saíram: chamavam atenção para a troca, e não para os negócios.
+- As figuras do cortejo deixaram de ser links para os tipos de negócio. A ligação era arbitrária: a figura não tinha relação com a categoria a que levava, e a etiqueta "Moda e acessórios · 1 negócio" confundia mais do que ajudava. Sem os links e as contagens, o cortejo não depende do banco e sai pronto no HTML, sem o cortejo de espera. Os tipos continuam ao alcance pelo Explorar, pelo perfil e pelo sitemap.
 - Os números do diretório (#278) entram numa faixa compacta abaixo do cortejo. Comparamos três topos: só a animação, só os números grandes no lugar dela, e os dois. Só a animação não mostrava que o diretório é grande e de verdade. Só os números deixavam a inicial com cara de diretório qualquer. Com os dois, o cortejo abre a página e os números confirmam logo abaixo. Enquanto os números carregam, a faixa aparece vazia com a mesma altura, para a busca não pular.
 - `npm run cortejo:ciclos` executa `scripts/gerar-ciclos.mjs` e gera `src/components/cortejo/ciclos.css`.
 - Não edite os ciclos gerados. As medidas e os pivôs estão em `src/components/cortejo/RIG.md`.

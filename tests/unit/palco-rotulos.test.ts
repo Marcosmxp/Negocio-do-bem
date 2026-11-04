@@ -1,23 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { linhasDaPlaca, medidasDaPlaca, rotuloDoLink, textoDoTotal } from "@/components/cortejo/rotulos";
-
-describe("rotuloDoLink", () => {
-  it("diz para onde o link leva, com o tipo de negócio em minúscula", () => {
-    expect(rotuloDoLink("Café e padaria")).toBe("Ver negócios de café e padaria");
-    expect(rotuloDoLink("Moda e acessórios")).toBe("Ver negócios de moda e acessórios");
-    expect(rotuloDoLink("Saúde")).toBe("Ver negócios de saúde");
-    expect(rotuloDoLink("Mercado e empório")).toBe("Ver negócios de mercado e empório");
-  });
-});
-
-describe("textoDoTotal", () => {
-  it("conta os negócios em português", () => {
-    expect(textoDoTotal(0)).toBe("Nenhum negócio ainda");
-    expect(textoDoTotal(1)).toBe("1 negócio");
-    expect(textoDoTotal(12)).toBe("12 negócios");
-    expect(textoDoTotal(1234)).toBe("1.234 negócios");
-  });
-});
+import { linhasDaPlaca, medidasDaPlaca } from "@/components/cortejo/rotulos";
 
 describe("linhasDaPlaca", () => {
   it("palavras curtas ficam numa linha só", () => {

@@ -806,7 +806,7 @@ Código: filtros e "Onde?" em `src/lib/diretorio.ts`, consultas em `src/lib/cons
 
 ### Página inicial
 
-- **O cortejo animado** apresenta quatro tipos de negócio, com suas contagens e links para as páginas de tipo. Ele tem controle de pausa e respeita a preferência por menos movimento. As figuras trocam de técnica sem mostrar o nome dela.
+- **O cortejo animado** mostra quatro pessoas, com placas que formam a frase "Compre de quem faz o bem", e um cachorro. As figuras são desenho: não levam a nenhum tipo de negócio, não mostram contagem e ficam fora do leitor de tela, porque as placas repetem o título. Elas trocam de técnica sem mostrar o nome dela. O cortejo tem controle de pausa e respeita a preferência por menos movimento.
 - **Os números do diretório** ficam numa faixa entre o cortejo e a busca:
   - negócios do bem no diretório;
   - cidades, com o número de estados;
@@ -888,7 +888,7 @@ São as páginas que respondem às buscas mais comuns, como "negócios do bem em
 - **"Outros" não tem página:** não diz nada para quem busca.
 - **Quem chega às páginas:**
   - o perfil público liga o tipo, a cidade e cada causa às suas páginas;
-  - a página inicial liga as causas e os tipos do cortejo às suas páginas;
+  - a página inicial liga as causas às suas páginas;
   - "Como funciona" liga cada causa à sua página;
   - o rodapé tem "Negócios por cidade";
   - o sitemap e o `llms.txt` listam as páginas.

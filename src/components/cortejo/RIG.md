@@ -166,15 +166,15 @@ por quadro. Use as camadas acima.
 ## O palco
 
 ```tsx
-<Cortejo personagens={personagensDoCortejo(porCategoria)} tecnicas={["pintura", "xilogravura", "barro", "azulejo"]} />
+<Cortejo personagens={PERSONAGENS_DO_CORTEJO} tecnicas={["pintura", "xilogravura", "barro", "azulejo"]} />
 ```
 
-- `personagens`: `{ id, placa, href, rotulo, total }` para cada pessoa e `{ id: "caramelo" }`.
-  `personagensDoCortejo(resumoDoDiretorio().porCategoria)` monta os cinco na ordem do plano.
+- `personagens`: `{ id, placa }` para cada pessoa e `{ id: "caramelo" }`.
+  `PERSONAGENS_DO_CORTEJO` (`dados.ts`) traz os cinco na ordem do plano.
   O caramelo anda junto da última pessoa.
 - `tecnicas`: a ordem da troca. Nomes desconhecidos são ignorados. Cada técnica fica de 3 a 4 segundos.
-- Cada pessoa é um link com o nome "Ver negócios de <tipo>". Passar o mouse ou focar para a pessoa
-  e mostra a etiqueta com o tipo e a contagem.
+- As figuras são desenho: não são links, não mostram etiqueta e a fila fica com `aria-hidden`,
+  porque as placas repetem o título da página.
 - O palco mostra o estado em `data-estado` (`rodando` ou `parado`) e o motivo em `data-motivo`
   (`carregando`, `movimento-reduzido`, `visitante`, `aba-oculta`, `fora-da-tela`).
 - Sem JavaScript, com movimento reduzido, fora da tela ou com a aba escondida, as figuras ficam paradas

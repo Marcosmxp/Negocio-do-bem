@@ -1,10 +1,8 @@
 import { createElement, Fragment } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { personagensDoCortejo, PESSOAS_DO_CORTEJO } from "@/components/cortejo/dados";
+import { PERSONAGENS_DO_CORTEJO } from "@/components/cortejo/dados";
 import { CLASSES_DO_RIG, ORDEM_DO_CORTEJO, PERSONAGENS } from "@/components/cortejo/personagens";
-import { hrefTipo, temPaginaDeTipo } from "@/lib/diretorio";
-import { CATEGORIAS } from "@/lib/dominio";
 
 /** As tags de abertura que têm a classe pedida. */
 function tagsComClasse(html: string, classe: string): string[] {
@@ -103,8 +101,8 @@ describe("caramelo", () => {
   });
 });
 
-describe("personagensDoCortejo", () => {
-  const lista = personagensDoCortejo({ "Café e padaria": 12, Saúde: 3 });
+describe("PERSONAGENS_DO_CORTEJO", () => {
+  const lista = PERSONAGENS_DO_CORTEJO;
 
   it("põe os cinco na ordem do cortejo", () => {
     expect(lista.map((p) => p.id)).toEqual(ORDEM_DO_CORTEJO);
@@ -115,22 +113,12 @@ describe("personagensDoCortejo", () => {
     expect(placas.join(" ")).toBe("COMPRE DE QUEM FAZ O BEM");
   });
 
-  it("cada pessoa leva à página do seu tipo de negócio", () => {
-    expect(PESSOAS_DO_CORTEJO.map((p) => p.rotulo)).toEqual(["Café e padaria", "Moda e acessórios", "Saúde", "Mercado e empório"]);
-    for (const pessoa of lista) {
-      if (!("href" in pessoa)) continue;
-      expect(CATEGORIAS).toContain(pessoa.rotulo);
-      expect(temPaginaDeTipo(pessoa.rotulo)).toBe(true);
-      expect(pessoa.href).toBe(hrefTipo(pessoa.rotulo));
-    }
+  it("as pessoas só carregam a placa, sem tipo de negócio, link ou contagem", () => {
+    // A ligação entre a figura e a categoria era arbitrária (#278).
+    for (const pessoa of lista) expect(Object.keys(pessoa).sort()).toEqual("placa" in pessoa ? ["id", "placa"] : ["id"]);
   });
 
-  it("usa a contagem da categoria e zero quando ela falta", () => {
-    const totais = Object.fromEntries(lista.flatMap((p) => ("total" in p ? [[p.id, p.total]] : [])));
-    expect(totais).toEqual({ padeira: 12, costureira: 0, psicologa: 3, agricultor: 0 });
-  });
-
-  it("o caramelo não é link", () => {
+  it("o caramelo vem por último, sem placa", () => {
     expect(lista.at(-1)).toEqual({ id: "caramelo" });
   });
 });
