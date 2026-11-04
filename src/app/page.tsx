@@ -72,10 +72,12 @@ export default function Inicio() {
                       </li>
                     ))}
                   </ul>
-                  <ul aria-hidden="true" inert>
+                  {/* A cópia fecha o laço e ocupa boa parte da faixa. Ela também leva à
+                      causa no clique, mas fica fora do leitor de tela e do Tab. */}
+                  <ul aria-hidden="true">
                     {faixa.causas.map((causa) => (
                       <li key={causa.slug}>
-                        <span>{causa.nome}</span>
+                        <Link href={causa.href} tabIndex={-1}>{causa.nome}</Link>
                       </li>
                     ))}
                   </ul>

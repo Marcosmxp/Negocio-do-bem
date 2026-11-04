@@ -40,7 +40,7 @@ export function CampoOnde({ cidades, valorInicial }: { cidades: CidadeComNegocio
 
   return (
     <div className="relative min-w-0 flex-[2_1_15rem]">
-      <label className="flex cursor-text items-center gap-3.5 rounded-2xl bg-papel px-4 py-3 transition focus-within:bg-coral-50">
+      <label className="flex cursor-text items-center gap-3.5 rounded-lg bg-papel px-4 py-3 transition focus-within:bg-coral-50">
         <IconePino />
         <span className="flex min-w-0 flex-1 flex-col">
           <span className="text-xs font-semibold text-suave">Onde?</span>
