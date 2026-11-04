@@ -5,7 +5,7 @@ import { after } from "next/server";
 import { z } from "zod";
 import { exigirUsuario } from "@/lib/auth/sessao";
 import { AVISOS } from "@/lib/avisos";
-import { db } from "@/lib/db";
+import { db, semDuplicar } from "@/lib/db";
 import { texto, valoresDoFormulario, type EstadoFormulario } from "@/lib/formulario";
 import { medir } from "@/lib/medicao-servidor";
 import { avisarNovaDenuncia, avisarNovoDepoimento } from "@/lib/notificacoes";
@@ -42,7 +42,12 @@ export async function publicarDepoimento(_estado: EstadoFormulario, dados: FormD
   });
   if (jaEscreveu) return { erro: "Você já deixou um depoimento para este negócio. Obrigado!" };
 
-  const depoimento = await db.depoimento.create({ data: { empresaId: empresa.id, autorId: usuario.id, texto: resultado.data } });
+  // Se dois pedidos passaram juntos pelo findUnique, somente um ganha a chave única.
+  // O segundo não gera e-mail nem evento de analytics.
+  const depoimento = await semDuplicar(
+    db.depoimento.create({ data: { empresaId: empresa.id, autorId: usuario.id, texto: resultado.data } }),
+  );
+  if (!depoimento) return { erro: "Você já deixou um depoimento para este negócio. Obrigado!" };
   after(() => avisarNovoDepoimento(depoimento.id));
   await medir({ nome: "depoimento_publicado", params: { categoria: empresa.categoria } });
   redirect(`/empresas/${empresa.instagramUsername}?aviso=depoimento_publicado#depoimentos`);
