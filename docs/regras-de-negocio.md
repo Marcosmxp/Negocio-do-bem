@@ -1189,7 +1189,7 @@ Os [próximos passos do README](../README.md#próximos-passos-sugeridos) listam 
 ## MFA e contenção de sessões (#103)
 
 - Moderação exige papel moderador e MFA verificado em sessão, mesmo após Google ou link por e-mail.
-- Ativação em /seguranca/mfa exige senha atual e código TOTP válido. Conta Google sem senha precisa criar uma senha pelo link de recuperação antes.
+- Ativação em /seguranca/mfa exige senha atual e código TOTP válido. A chave pendente expira após 10 minutos e exige reiniciar a configuração; uma chave expirada não pode ser ativada numa corrida entre pedidos. Conta Google sem senha precisa criar uma senha pelo link de recuperação antes.
 - O segredo TOTP é cifrado com AES-256-GCM usando MFA_ENCRYPTION_KEY (32 bytes em base64), configurado exclusivamente como secret do servidor. A chave deve persistir entre deploys.
 - Após ativação, dez códigos de recuperação com 128 bits aleatórios são apresentados uma única vez; guardam-se somente hashes. Cada código é consumido atomicamente.
 - Códigos TOTP aceitos não podem ser reutilizados e admitem tolerância de um intervalo de 30 segundos.
