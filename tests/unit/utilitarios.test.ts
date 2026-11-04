@@ -123,6 +123,25 @@ describe("campoMapa", () => {
     expect(campoMapa.parse("https://maps.apple/p/AbC123")).toBe("https://maps.apple/p/AbC123");
   });
 
+  it("recusa caminhos que apenas começam com maps e URLs com credenciais ou portas não padrão", () => {
+    expect(campoMapa.safeParse("https://www.google.com/mapsfoo").success).toBe(false);
+    expect(campoMapa.safeParse("https://goo.gl/mapsmalicioso").success).toBe(false);
+    expect(campoMapa.safeParse("https://www.google.com/maps").success).toBe(true);
+    expect(campoMapa.safeParse("https://www.google.com/maps/place/Padaria").success).toBe(true);
+    expect(campoMapa.safeParse("https://usuario:senha@maps.apple.com/?q=Padaria").success).toBe(false);
+    expect(campoMapa.safeParse("https://maps.apple.com:8443/?q=Padaria").success).toBe(false);
+  });
+
+  it("valida o limite após normalizar, evitando gravar URLs impossíveis de editar", () => {
+    const entrada = "maps.google.com/?q=" + "a".repeat(975);
+    expect(entrada.length).toBe(994);
+    expect(campoMapa.safeParse(entrada).success).toBe(false);
+    const urlValida = campoMapa.parse("maps.google.com/?q=" + "a".repeat(965));
+    expect(urlValida).not.toBeNull();
+    expect(urlValida!.length).toBeLessThanOrEqual(1000);
+    expect(campoMapa.parse(urlValida!)).toBe(urlValida);
+  });
+
   it("recusa links que não são de mapa", () => {
     expect(campoMapa.safeParse("https://www.google.com/search?q=padaria").success).toBe(false);
     expect(campoMapa.safeParse("https://goo.gl/AbC123").success).toBe(false);
