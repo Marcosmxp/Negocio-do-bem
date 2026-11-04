@@ -39,6 +39,8 @@ export function FaixaRolante({
     medir();
     const observador = new ResizeObserver(medir);
     if (janela.current) observador.observe(janela.current);
+    // Fontes, rótulos e dados podem alterar a lista sem redimensionar o contêiner.
+    if (lista.current) observador.observe(lista.current);
     return () => observador.disconnect();
   }, []);
 
@@ -54,7 +56,12 @@ export function FaixaRolante({
             {itens}
           </ul>
           {rolando && (
-            <ul className="flex gap-4 pr-4 motion-reduce:hidden" aria-hidden="true">
+            <ul
+              className="flex gap-4 pr-4 motion-reduce:hidden"
+              aria-hidden="true"
+              // Clones aceitam clique, mas jamais devem manter foco dentro de aria-hidden.
+              onFocusCapture={(evento) => evento.target.blur()}
+            >
               {copia}
             </ul>
           )}

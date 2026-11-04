@@ -45,6 +45,15 @@ describe("faixa dos embaixadores", () => {
     expect(html).toContain('href="/cidades/recife-pe"');
   });
 
+  it("acompanha alterações de largura dos itens sem depender só da janela", () => {
+    expect(faixaRolante).toContain("observador.observe(janela.current)");
+    expect(faixaRolante).toContain("observador.observe(lista.current)");
+  });
+
+  it("não deixa elementos da cópia receberem foco após um clique", () => {
+    expect(faixaRolante).toContain('onFocusCapture={(evento) => evento.target.blur()}');
+  });
+
   it("a cópia fica fora do leitor de tela, mas continua clicável", () => {
     // Com inert, os rostos repetidos não abriam nada, e boa parte da faixa na tela é a cópia.
     const copia = faixaRolante.match(/<ul[^>]*aria-hidden="true"[^>]*>[\s\S]*?<\/ul>/)?.[0];
