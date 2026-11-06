@@ -7,6 +7,7 @@ import { AvisoDaUrl } from "@/components/Avisos";
 import { BotaoCopiarLink } from "@/components/BotaoCopiarLink";
 import { CapaDoNegocio } from "@/components/CapaDoNegocio";
 import { CausaBadge } from "@/components/CausaBadge";
+import { CoracaoFavorito, type EstadoFavorito } from "@/components/CoracaoFavorito";
 import { ConfirmarEmail } from "@/components/ConfirmarEmail";
 import { EmpresaLinha } from "@/components/EmpresaLinha";
 import { Historia } from "@/components/Historia";
@@ -17,14 +18,14 @@ import { LinkInstagram } from "@/components/LinkInstagram";
 import { SeloStatus } from "@/components/SeloStatus";
 import { usuarioAtual, type UsuarioSessao } from "@/lib/auth/sessao";
 import { buscarCausa, filtrarCausas, GRUPOS, type GrupoCausa } from "@/lib/causas";
-import { buscarPerfil, ehDono, negociosParecidos, podeVerPerfil } from "@/lib/consultas";
+import { buscarPerfil, coracoesDaLista, ehDono, negociosParecidos, podeVerPerfil } from "@/lib/consultas";
 import { hrefCausa, hrefTipo, temPaginaDeTipo } from "@/lib/diretorio";
 import { MODERACAO_EMPRESA } from "@/lib/dominio";
 import { temInstagram } from "@/lib/endereco";
 import { linkPerfil, normalizarEndereco } from "@/lib/instagram";
 import { medirContato, type CanalDeContato } from "@/lib/medicao";
 import { FORA_DA_BUSCA, jsonLdDoNegocio, metadadosDaPagina, paginaDaCidade } from "@/lib/seo";
-import { formatarData, formatarTelefone, tempoDeLeitura } from "@/lib/texto";
+import { formatarData, formatarFavoritos, formatarTelefone, tempoDeLeitura } from "@/lib/texto";
 import { FormDepoimento } from "./FormDepoimento";
 
 export async function generateMetadata(props: PageProps<"/empresas/[usuario]">): Promise<Metadata> {
@@ -62,6 +63,10 @@ async function Perfil({ params, searchParams }: Pick<PageProps<"/empresas/[usuar
   const publico = empresa.moderacao === "aprovada" && !empresa.oculta;
   // Os cliques nos contatos contam no Analytics só quando vêm do público, não do dono.
   const contato = publico && !dono ? empresa : undefined;
+  // Só um negócio do diretório pode ser favoritado, e o dono não favorita o próprio (sem coração).
+  const coracao = publico
+    ? (await coracoesDaLista(usuario, [empresa.id], `/empresas/${empresa.instagramUsername}`))(empresa.id)
+    : undefined;
 
   return (
     <article>
@@ -114,18 +119,23 @@ async function Perfil({ params, searchParams }: Pick<PageProps<"/empresas/[usuar
                 </span>
               )}
             </p>
-            <Acoes empresa={empresa} medir={!!contato} compartilhar={publico} />
+            <Acoes empresa={empresa} medir={!!contato} compartilhar={publico} favorito={coracao} />
           </div>
         </header>
 
         <p className="mx-1 mt-8 max-w-[52ch] border-l-[3px] border-coral py-0.5 pl-4 font-serif text-[1.375rem] leading-snug font-medium text-tinta italic text-pretty sm:mx-6">{empresa.resumo}</p>
 
         {(dono || usuario?.moderador) && (
-          <div className="mt-6 px-1 sm:px-6">
+          <div className="mt-6 flex flex-wrap items-center gap-3 px-1 sm:px-6">
             {dono ? (
-              <Link href={`/painel/${empresa.instagramUsername}`} className="botao">
-                Editar meu perfil
-              </Link>
+              <>
+                <Link href={`/painel/${empresa.instagramUsername}`} className="botao">
+                  Editar meu perfil
+                </Link>
+                {publico && empresa._count.favoritos > 0 && (
+                  <span className="text-sm text-suave">{formatarFavoritos(empresa._count.favoritos)}</span>
+                )}
+              </>
             ) : (
               <Link href={`/moderacao/negocios/${empresa.instagramUsername}`} className="botao">
                 Editar perfil (moderação)
@@ -189,11 +199,24 @@ async function Perfil({ params, searchParams }: Pick<PageProps<"/empresas/[usuar
   );
 }
 
-/** O que a pessoa pode fazer logo no topo: o contato principal e compartilhar. */
-function Acoes({ empresa, medir, compartilhar }: { empresa: Perfil; medir: boolean; compartilhar: boolean }) {
+/**
+ * O que a pessoa pode fazer logo no topo: o contato principal, favoritar (com quantas pessoas
+ * já favoritaram) e compartilhar. Sem `favorito`, não há coração: o dono não favorita o próprio.
+ */
+function Acoes({
+  empresa,
+  medir,
+  compartilhar,
+  favorito,
+}: {
+  empresa: Perfil;
+  medir: boolean;
+  compartilhar: boolean;
+  favorito?: EstadoFavorito;
+}) {
   const instagram = temInstagram(empresa.instagramUsername);
   const medida = (canal: CanalDeContato) => (medir ? medirContato(canal, empresa) : {});
-  if (!empresa.whatsapp && !instagram && !compartilhar) return null;
+  if (!empresa.whatsapp && !instagram && !compartilhar && !favorito) return null;
   return (
     <div className="flex flex-wrap items-center gap-2 pt-3">
       {empresa.whatsapp ? (
@@ -226,6 +249,7 @@ function Acoes({ empresa, medir, compartilhar }: { empresa: Perfil; medir: boole
           Compartilhar
         </BotaoCopiarLink>
       )}
+      {favorito && <CoracaoFavorito estado={favorito} nome={empresa.nome} comTexto total={empresa._count.favoritos} />}
     </div>
   );
 }
