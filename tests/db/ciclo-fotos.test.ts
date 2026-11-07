@@ -1,10 +1,12 @@
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import path from "node:path";
 import { indicarEmpresa, removerFoto, salvarEmpresa, trocarFoto } from "@/acoes/empresas";
-import { enviarDocumento } from "@/acoes/reivindicacoes";
-import { aprovar } from "@/lib/reivindicacao";
+import { aprovar, solicitarPorDocumento } from "@/lib/reivindicacao";
 import * as armazenamento from "@/lib/armazenamento";
+import { trocarFotoDoEmbaixador } from "@/acoes/embaixadores";
+import { atualizarPeloInstagram } from "@/lib/embaixadores";
 import { aplicarFotoDoInstagram } from "@/lib/fotos-instagram";
+import { esquecerPrevias } from "@/lib/previa-instagram";
 import { migrarReferenciasFotos } from "@/lib/publicacao-fotos";
 import { apagarFoto, limparFotosHistorias } from "@/lib/armazenamento";
 import { exigirUsuario } from "@/lib/auth/sessao";
@@ -13,7 +15,7 @@ import { db } from "@/lib/db";
 import { hrefModeracao, lerFiltros } from "@/lib/moderacao/filtros";
 import { listarAuditoria } from "@/lib/moderacao/consultas";
 
-vi.mock("@/lib/auth/sessao", () => ({ exigirUsuario: vi.fn(), caminhoSeguro: (valor: string) => valor }));
+vi.mock("@/lib/auth/sessao", () => ({ exigirUsuario: vi.fn(), exigirModerador: vi.fn(async () => ({ id: "moderacao-teste" })), caminhoSeguro: (valor: string) => valor }));
 vi.mock("next/server", async (importar) => ({ ...await importar<typeof import("next/server")>(), after: vi.fn() }));
 const barreira = vi.hoisted(() => ({ depoisDeValidar: undefined as (() => Promise<void>) | undefined }));
 vi.mock("@/lib/publicacao-fotos", async (importar) => {
@@ -44,7 +46,7 @@ const FOTO = "https://fotos.exemplo.com/historias/aaaaaaaaaaaaaaaaaaaaaaaa.jpg";
 
 async function limparBanco() {
   await db.$executeRawUnsafe(
-    `TRUNCATE "FotoAposentada", "RegistroAuditoria", "Depoimento", "Reivindicacao", "EmpresaMembro", "EmpresaCausa", "Empresa", "Sessao", "Usuario" CASCADE`,
+    `TRUNCATE "FotoAposentada", "RegistroAuditoria", "Depoimento", "Reivindicacao", "Embaixador", "EmpresaMembro", "EmpresaCausa", "Empresa", "Sessao", "Usuario" CASCADE`,
   );
 }
 
@@ -78,14 +80,14 @@ async function formularioDaDona(username: string, historia: string) {
   return { empresa, dados };
 }
 
-async function formularioDaReivindicacao(username: string) {
+/** O formulário de reivindicação não envia mais o site: a fotografia entra direto na regra. */
+async function pedidoDeReivindicacao(username: string) {
   const empresa = await criarEmpresa(username, "");
   await db.empresa.update({ where: { id: empresa.id }, data: { moderacao: "rejeitada" } });
   const usuario = await db.usuario.create({ data: { nome: "Pessoa solicitante", email: `${username}@example.test` } });
-  vi.mocked(exigirUsuario).mockResolvedValue({ ...usuario, moderador: false, emailConfirmado: true });
-  const dados = new FormData();
-  for (const [campo, valor] of Object.entries({ empresaId: empresa.id, cnpj: "", site: FOTO, relacao: "Sou dona", contato: "contato@example.test", mensagem: "" })) dados.set(campo, valor);
-  return { empresa, usuario, dados };
+  const solicitar = () =>
+    solicitarPorDocumento({ empresaId: empresa.id, usuarioId: usuario.id, cnpj: null, site: FOTO, relacao: "Sou dona", contato: "contato@example.test", mensagem: null });
+  return { empresa, usuario, solicitar };
 }
 
 async function publicacaoDeSite(caminho: "edicao" | "indicacao" | "reivindicacao") {
@@ -95,8 +97,17 @@ async function publicacaoDeSite(caminho: "edicao" | "indicacao" | "reivindicacao
     return { publicar: () => salvarEmpresa(undefined, dados) };
   }
   if (caminho === "reivindicacao") {
-    const { dados } = await formularioDaReivindicacao("corrida.site.reivindicacao");
-    return { publicar: () => enviarDocumento(undefined, dados) };
+    const { solicitar } = await pedidoDeReivindicacao("corrida.site.reivindicacao");
+    // Igual a salvarEmpresa: sucesso termina em redirect, recusa devolve o erro do campo.
+    return {
+      publicar: () => solicitar().then(
+        () => { throw new Error("NEXT_REDIRECT"); },
+        (erro: unknown) => {
+          if (erro instanceof ErroFotoDescartada) return { erros: { site: erro.message }, valores: { site: FOTO } };
+          throw erro;
+        },
+      ),
+    };
   }
   const usuario = await db.usuario.create({ data: { nome: "Pessoa indicadora", email: "indicacao-site@example.test" } });
   vi.mocked(exigirUsuario).mockResolvedValue({ ...usuario, moderador: false, emailConfirmado: true });
@@ -165,17 +176,17 @@ describe("ciclo das fotos", () => {
   });
 
   it("preserva foto publicada somente no site de uma reivindicação real", async () => {
-    const { empresa, dados } = await formularioDaReivindicacao("site.reivindicacao");
-    await expect(enviarDocumento(undefined, dados)).rejects.toThrow("NEXT_REDIRECT");
+    const { empresa, solicitar } = await pedidoDeReivindicacao("site.reivindicacao");
+    await solicitar();
     expect(await db.reivindicacao.findFirst({ where: { empresaId: empresa.id } })).toMatchObject({ site: FOTO });
     expect(await limparFotosHistorias([FOTO], true)).toEqual([{ url: FOTO, status: "preservada" }]);
     expect(del).not.toHaveBeenCalled();
   });
 
   it("a reivindicação real recusa site aposentado sem criar o pedido", async () => {
-    const { dados } = await formularioDaReivindicacao("site.reivindicacao.aposentada");
+    const { solicitar } = await pedidoDeReivindicacao("site.reivindicacao.aposentada");
     await limparFotosHistorias([FOTO], true);
-    expect(await enviarDocumento(undefined, dados)).toMatchObject({ erros: { site: expect.any(String) }, valores: { site: FOTO } });
+    await expect(solicitar()).rejects.toBeInstanceOf(ErroFotoDescartada);
     expect(await db.reivindicacao.count()).toBe(0);
   });
 
@@ -217,8 +228,8 @@ describe("ciclo das fotos", () => {
   });
 
   it("a aprovação mantém o site salvo no pedido sem copiá-lo para a empresa", async () => {
-    const { empresa, dados } = await formularioDaReivindicacao("site.aprovacao");
-    await expect(enviarDocumento(undefined, dados)).rejects.toThrow("NEXT_REDIRECT");
+    const { empresa, solicitar } = await pedidoDeReivindicacao("site.aprovacao");
+    await solicitar();
     const pedido = await db.reivindicacao.findFirstOrThrow({ where: { empresaId: empresa.id } });
     await aprovar({ reivindicacaoId: pedido.id, revisorId: null });
     expect((await db.reivindicacao.findUniqueOrThrow({ where: { id: pedido.id } })).status).toBe("aprovada");
@@ -228,7 +239,7 @@ describe("ciclo das fotos", () => {
   });
 
   it("a reivindicação adquire a trava de fotos antes da trava da pessoa", async () => {
-    const { usuario, dados } = await formularioDaReivindicacao("site.ordem.travas");
+    const { usuario, solicitar } = await pedidoDeReivindicacao("site.ordem.travas");
     const presa = Promise.withResolvers<void>();
     const liberar = Promise.withResolvers<void>();
     const pessoaPresa = db.$transaction(async (tx) => {
@@ -237,7 +248,7 @@ describe("ciclo das fotos", () => {
       await liberar.promise;
     });
     await presa.promise;
-    const publicacao = enviarDocumento(undefined, dados).catch((erro: Error) => erro);
+    const publicacao = solicitar().catch((erro: Error) => erro);
     try {
       let fotoAntesDaPessoa = false;
       for (let tentativa = 0; tentativa < 100 && !fotoAntesDaPessoa; tentativa++) {
@@ -250,7 +261,7 @@ describe("ciclo das fotos", () => {
       liberar.resolve();
       await pessoaPresa;
     }
-    expect(await publicacao).toMatchObject({ message: "NEXT_REDIRECT" });
+    expect(await publicacao).toMatchObject({ site: FOTO });
   });
 
   it("não apaga uma foto usada na história de outro negócio", async () => {
@@ -450,6 +461,45 @@ describe("ciclo das fotos", () => {
       arquivo: new File([new Uint8Array([0xff, 0xd8, 0xff])], "foto.jpg"), tipo: "image/jpeg",
     })).rejects.toBeInstanceOf(ErroFotoDescartada);
     expect((await db.empresa.findUniqueOrThrow({ where: { id: empresa.id } })).fotoUrl).toBeNull();
+  });
+
+  it("preserva uma chave de historias/ usada como foto de um embaixador", async () => {
+    await db.embaixador.create({ data: { instagramUsername: "embaixadora.foto", nome: "Pessoa embaixadora", uf: "PE", fotoUrl: FOTO } });
+    expect(await limparFotosHistorias([FOTO], true)).toEqual([{ url: FOTO, status: "preservada" }]);
+    expect(await db.fotoAposentada.count()).toBe(0);
+    expect(del).not.toHaveBeenCalled();
+  });
+
+  it("a troca de foto do embaixador rejeita uma chave aposentada sem gravá-la", async () => {
+    const embaixador = await db.embaixador.create({ data: { instagramUsername: "embaixador.troca", nome: "Pessoa embaixadora", uf: "PE" } });
+    await limparFotosHistorias([FOTO], true);
+    vi.spyOn(armazenamento, "guardarFoto").mockResolvedValueOnce(FOTO);
+    const dados = new FormData();
+    dados.set("embaixadorId", embaixador.id);
+    dados.set("foto", new File([new Uint8Array([0xff, 0xd8, 0xff])], "foto.jpg"));
+    expect(await trocarFotoDoEmbaixador(undefined, dados)).toMatchObject({ erro: expect.stringContaining("entrou em descarte") });
+    expect((await db.embaixador.findUniqueOrThrow({ where: { id: embaixador.id } })).fotoUrl).toBeNull();
+    expect(await db.registroAuditoria.count({ where: { alvoId: embaixador.id } })).toBe(0);
+  });
+
+  it("a consulta do Instagram rejeita uma chave aposentada no embaixador sem gravá-la", async () => {
+    const embaixador = await db.embaixador.create({ data: { instagramUsername: "embaixador.instagram", nome: "Pessoa embaixadora", uf: "PE" } });
+    await limparFotosHistorias([FOTO], true);
+    vi.spyOn(armazenamento, "guardarFoto").mockResolvedValueOnce(FOTO);
+    vi.stubEnv("META_ACCESS_TOKEN", "token-de-teste");
+    vi.stubEnv("META_IG_USER_ID", "17841400000000000");
+    esquecerPrevias();
+    const webp = new Uint8Array([...Buffer.from("RIFF"), 0, 0, 0, 0, ...Buffer.from("WEBP")]);
+    vi.stubGlobal("fetch", vi.fn(async (url: URL | string) => String(url).startsWith("https://graph.facebook.com/")
+      ? Response.json({ business_discovery: { name: "x", followers_count: 10, profile_picture_url: "https://scontent.cdninstagram.com/v/foto.webp" } })
+      : new Response(webp, { status: 200, headers: { "content-type": "image/webp" } })));
+    try {
+      await expect(atualizarPeloInstagram(embaixador.id)).rejects.toBeInstanceOf(ErroFotoDescartada);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+    expect((await db.embaixador.findUniqueOrThrow({ where: { id: embaixador.id } })).fotoUrl).toBeNull();
+    expect(await db.registroAuditoria.count({ where: { alvoId: embaixador.id } })).toBe(0);
   });
 
   it.each(["historia", "fotoUrl"])("o CAS da migração rejeita %s aposentada", async (campo) => {

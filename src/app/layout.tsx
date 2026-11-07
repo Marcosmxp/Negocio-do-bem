@@ -111,11 +111,13 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
               <p className="font-semibold text-tinta">Comunidade</p>
               <Link href="/explorar" className="block hover:text-tinta">Explorar negócios</Link>
               <Link href="/cidades" className="block hover:text-tinta">Negócios por cidade</Link>
+              <Link href="/embaixadores" className="block hover:text-tinta">Embaixadores do bem</Link>
               <Link href="/participar" className="block hover:text-tinta">Cadastrar um negócio</Link>
             </div>
             <div className="space-y-2">
               <p className="font-semibold text-tinta">Para negócios</p>
               <Link href="/sobre#dono" className="block hover:text-tinta">Reivindicar meu perfil</Link>
+              <Link href="/clube-do-bem" className="block hover:text-tinta">Clube do Bem</Link>
               <Link href="/sobre#privacidade" className="block hover:text-tinta">Privacidade e remoção</Link>
             </div>
           </div>

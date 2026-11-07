@@ -27,7 +27,9 @@ import { enderecoLivre, enderecoSemInstagram } from "@/lib/endereco";
 import { semContatosDeTerceiros } from "@/lib/indicacao";
 import { normalizarUsername } from "@/lib/instagram";
 import { medir } from "@/lib/medicao-servidor";
+import { contatoMudou, suspenderPorContatoAlterado } from "@/lib/ofertas";
 import { textoDeBusca } from "@/lib/texto";
+import { trocarArroba, type ResultadoDaTroca } from "@/lib/troca-de-arroba";
 
 const LIMITE_INDICACOES_POR_DIA = 10;
 
@@ -263,6 +265,8 @@ export async function salvarEmpresa(_estado: EstadoFormulario, dados: FormData):
       await tx.empresaCausa.deleteMany({ where: { empresaId: empresa.id } });
       await tx.empresaCausa.createMany({ data: causas.map((causa) => ({ empresaId: empresa.id, causa })) });
       await auditarEdicao(tx, usuario.id, empresa, "empresa.editada", pelaModeracao);
+      // O dono trocou o contato: o Clube do Bem do negócio espera a moderação conferir de novo.
+      if (!pelaModeracao && contatoMudou(empresa, campos)) await suspenderPorContatoAlterado(tx, empresa);
     }, OPCOES_TRANSACAO_FOTOS);
   } catch (erro) {
     if (erro instanceof ErroFotoDescartada) return { erros: { [erro.campo === "site" ? "site" : "historia"]: erro.message }, valores };
@@ -335,4 +339,30 @@ export async function enviarFotoDaHistoria(dados: FormData): Promise<{ url?: str
     console.error("Falha ao guardar a foto da história", empresa.id, erro);
     return { erro: "Não conseguimos guardar a foto agora. Tente de novo em instantes." };
   }
+}
+
+/** Troca o @ do Instagram do negócio (#298): o dono ou a moderação. O endereço antigo redireciona para o novo. */
+export async function trocarArrobaDaEmpresa(_estado: EstadoFormulario, dados: FormData): Promise<EstadoFormulario> {
+  const { usuario, empresa, pelaModeracao } = await exigirEditor(texto(dados, "empresaId"), "/painel");
+  const valores = valoresDoFormulario(dados);
+  const novo = normalizarUsername(texto(dados, "instagram"));
+  if (!novo) return { erros: { instagram: "Digite o novo @ do Instagram do negócio (ex.: @padariadobairro)." }, valores };
+
+  let resultado: ResultadoDaTroca;
+  try {
+    resultado = await db.$transaction((tx) => trocarArroba(tx, empresa, novo, { usuarioId: usuario.id, pelaModeracao }));
+  } catch (erro) {
+    if (!violouUnicidade(erro)) throw erro;
+    resultado = "ocupado";
+  }
+  if (resultado === "ocupado") return { erros: { instagram: `@${novo} já é de outro negócio no Negócio do Bem.` }, valores };
+  if (resultado === "mesmo") return { erros: { instagram: `@${novo} já é o @ deste negócio.` }, valores };
+
+  // Sem foto, a do novo perfil do Instagram vira a foto do negócio (nunca troca uma foto enviada).
+  if (!empresa.fotoUrl) after(() => gravarFotoDaPrevia(empresa.id, novo));
+  const voltar = voltarDe(dados, empresa)
+    .split("/")
+    .map((parte) => (parte === empresa.instagramUsername ? novo : parte))
+    .join("/");
+  redirect(`${voltar}?aviso=arroba_trocado`);
 }

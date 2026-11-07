@@ -22,9 +22,10 @@ export function objetoDaFoto(url: string): { dominio: string; chave: string } {
     : { dominio: new URL(identidade).origin, chave: new URL(identidade).pathname.slice(1) };
 }
 
-async function fotosEmUso(cliente: Pick<Prisma.TransactionClient, "empresa" | "reivindicacao">): Promise<Set<string>> {
+async function fotosEmUso(cliente: Pick<Prisma.TransactionClient, "empresa" | "reivindicacao" | "embaixador">): Promise<Set<string>> {
   const empresas = await cliente.empresa.findMany({ select: { historia: true, fotoUrl: true, site: true } });
   const reivindicacoes = await cliente.reivindicacao.findMany({ select: { site: true } });
+  const embaixadores = await cliente.embaixador.findMany({ select: { fotoUrl: true } });
   const usadas = new Set<string>();
   for (const empresa of empresas) {
     for (const foto of chavesDaHistoria(empresa.historia)) usadas.add(foto);
@@ -33,6 +34,9 @@ async function fotosEmUso(cliente: Pick<Prisma.TransactionClient, "empresa" | "r
   }
   for (const reivindicacao of reivindicacoes) {
     for (const foto of chavesDaReferencia(reivindicacao.site ?? "")) usadas.add(foto);
+  }
+  for (const embaixador of embaixadores) {
+    for (const foto of chavesDaReferencia(embaixador.fotoUrl ?? "")) usadas.add(foto);
   }
   return usadas;
 }
