@@ -597,6 +597,27 @@ Antes, a moderação precisava conseguir o CNPJ com cada dono e digitar na ficha
 - **O dono não vê a ficha.** Ele só fica sabendo se o CNPJ está ativo. O quadro de sócios e a comparação do nome continuam só com a moderação.
 - **CNPJ inexistente é recusado na hora.** `buscarNaReceita` separa o 404 da BrasilAPI ("Não achamos este CNPJ na Receita") da consulta que falhou, que deixa o pedido entrar. O `consultarCnpj` continua devolvendo `null` nos dois casos, para quem já o usava.
 - **A página `/clube-do-bem` mudou junto:** o passo 1 do dono troca o aviso de "fase de convite" por três prints, com a caixa do painel, o formulário do CNPJ e o pedido em análise. O CNPJ dos prints (12.345.678/9999-66) tem os dígitos certos e não existe na Receita.
+
+### 7 de novembro: verificação do negócio com nome e CPF ([#293](https://github.com/fabs-reis/Negocio-do-bem/issues/293))
+
+A ideia: assumir o perfil continua imediato, e a **verificação** vem em seguida, no painel, com o CNPJ, o nome completo e o CPF. Aprovada, ela dá o selo "Perfil verificado" e libera o clube num passo só. As regras estão em [Liberação para o clube](regras-de-negocio.md#liberação-para-o-clube). Esta é a parte 1; o documento (RG ou CNH, num bucket R2 privado) é a parte 2.
+
+- **Migração pequena:** duas colunas em `LiberacaoClube`, `nomeCompleto` e `cpfMascarado`. O pedido do clube já era a linha certa para a verificação.
+- **O CPF inteiro nunca é guardado.** A Receita mostra do sócio só os 6 dígitos do meio (`***325350**`, conferido numa consulta real), então é só isso que dá para comparar, e é só isso que o banco guarda. A moderação vê "os dígitos do meio batem com um sócio", sem o número. O servidor nunca devolve o CPF num formulário com erro (`valores` leva só o CNPJ e o nome); ele só continua no campo porque o navegador mantém o que foi digitado.
+- **O selo "Perfil verificado" é derivado, sem campo novo:** é o perfil que tem um dono liberado (o mesmo critério do "Parceiro do Clube do Bem"). Assim a suspensão e a remoção do dono tiram o selo sozinhas, e não há dois estados para manter em sincronia. Nas listas do diretório, o selo continua "Perfil assumido"; fica para outra issue, porque pede a consulta da liberação em cada card.
+- **O formulário de assumir encolheu:** saíram CNPJ, site e contato (a moderação usa o e-mail da conta). Pedidos antigos mantêm o que enviaram.
+
+### 7 de novembro: a moderação tira um dono ([#292](https://github.com/fabs-reis/Negocio-do-bem/issues/292))
+
+Nos primeiros testes do clube em produção, a conta que assumiu um perfil não batia com a única sócia na Receita, e a moderação não tinha como tirar o acesso: só aprovando outra pessoa no modo "transferir". Agora cada dono tem o botão "Remover dos donos". As regras estão em [Tirar um dono](regras-de-negocio.md#tirar-um-dono).
+
+- **Sem migração.** O pedido aprovado da pessoa ganha o status `revogada`, e o motivo vai no `motivoRecusa`, que o painel e a ficha da conta já mostravam. O `status` já era texto.
+- **O pedido revogado é a memória da remoção.** Ele impede a aprovação na hora de um pedido novo da mesma pessoa para o mesmo negócio, nos três caminhos (dados do negócio, "Aprovar os N pedidos sem dono" e Entrar com Instagram). Sem isso, quem foi tirado de um negócio sem outros donos assumiria de novo no minuto seguinte. Os donos de hoje vieram todos de um pedido aprovado.
+- **O perfil volta a `indicada` quando fica sem dono.** Antes o selo "Perfil assumido" nunca voltava atrás, mas um perfil sem dono com o selo escondia o botão "Sou o dono" de quem é dono de verdade.
+- **Só as ofertas da pessoa saem do ar.** A suspensão da liberação pela moderação tira todas as ofertas do negócio, mas aqui o problema é a pessoa: a oferta de outro dono liberado continua.
+- **A remoção trava a linha do negócio** (`FOR NO KEY UPDATE`) antes de contar os donos que sobraram. Assim, duas remoções ao mesmo tempo, ou uma remoção e uma aprovação, não deixam um perfil sem dono marcado como assumido.
+- **Confirmação no servidor também.** A caixa "Confirmo" é `required` no HTML, e a ação confere `confirmo=sim` de novo, porque uma Server Action pode ser chamada sem o formulário.
+- **A transferência continua como era.** Quem sai dos donos numa transferência não recebe e-mail, e as ofertas que criou não são suspensas. Fica para outra issue, se a moderação precisar.
 ---
 
 ## 4. Arquitetura
