@@ -11,7 +11,7 @@ import { db } from "@/lib/db";
 import { MODERACAO_EMPRESA } from "@/lib/dominio";
 import { rotuloDoInstagram } from "@/lib/endereco";
 import { normalizarEndereco } from "@/lib/instagram";
-import { formatarData } from "@/lib/texto";
+import { formatarData, formatarFavoritos } from "@/lib/texto";
 import { EdicaoEmpresa } from "./EdicaoEmpresa";
 import { FORA_DA_BUSCA } from "@/lib/seo";
 
@@ -36,6 +36,7 @@ async function Conteudo({ params, searchParams }: Pick<PageProps<"/painel/[usuar
     include: {
       membros: { select: { usuarioId: true } },
       causas: { select: { causa: true } },
+      _count: { select: { favoritos: true } },
       depoimentos: {
         where: { status: "publicado" },
         orderBy: { criadoEm: "desc" },
@@ -45,6 +46,10 @@ async function Conteudo({ params, searchParams }: Pick<PageProps<"/painel/[usuar
   });
   if (!empresa || !empresa.membros.some((m) => m.usuarioId === usuario.id)) notFound();
   const { aviso } = await searchParams;
+  const liberacao = await db.liberacaoClube.findUnique({
+    where: { empresaId_usuarioId: { empresaId: empresa.id, usuarioId: usuario.id } },
+    select: { status: true },
+  });
 
   return (
     <div className="space-y-10">
@@ -56,14 +61,21 @@ async function Conteudo({ params, searchParams }: Pick<PageProps<"/painel/[usuar
           <div>
             <h1 className="font-serif text-4xl font-semibold tracking-tight">{empresa.nome}</h1>
             <p className="text-suave">
-              {rotuloDoInstagram(empresa.instagramUsername)} · {empresa.oculta ? "Oculto do diretório" : MODERACAO_EMPRESA[empresa.moderacao]}
+              {rotuloDoInstagram(empresa.instagramUsername)} · {empresa.oculta ? "Oculto do diretório" : MODERACAO_EMPRESA[empresa.moderacao]} ·{" "}
+              {formatarFavoritos(empresa._count.favoritos)}
             </p>
           </div>
-          <Link href={`/empresas/${empresa.instagramUsername}`} className="botao-claro botao-pequeno">
-            Ver perfil público ↗
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            <Link href={`/painel/${empresa.instagramUsername}/clube`} className="botao-claro botao-pequeno">
+              Clube do Bem
+            </Link>
+            <Link href={`/empresas/${empresa.instagramUsername}`} className="botao-claro botao-pequeno">
+              Ver perfil público ↗
+            </Link>
+          </div>
         </div>
         <AvisoDaUrl codigo={aviso} />
+        <ChamadaDoClube username={empresa.instagramUsername} status={liberacao?.status} />
       </div>
 
       <EdicaoEmpresa empresa={empresa} voltar={`/painel/${empresa.instagramUsername}`} />
@@ -120,6 +132,38 @@ async function Conteudo({ params, searchParams }: Pick<PageProps<"/painel/[usuar
           </BotaoEnviar>
         </form>
       </section>
+    </div>
+  );
+}
+
+/** O convite do Clube do Bem para o dono que ainda não foi verificado, ou o pedido em análise. */
+function ChamadaDoClube({ username, status }: { username: string; status?: string }) {
+  if (status === "liberada") return null;
+  if (status === "pendente") {
+    return (
+      <p className="cartao p-4 text-sm text-suave">
+        🎟️ A verificação do seu negócio para o Clube do Bem está em análise. A resposta aparece no{" "}
+        <Link href={`/painel/${username}/clube`} className="link">
+          painel do clube
+        </Link>
+        .
+      </p>
+    );
+  }
+  const deNovo = status === "recusada" || status === "suspensa";
+  return (
+    <div className="cartao flex flex-col gap-4 border-coral/40 p-5 sm:flex-row sm:items-center sm:justify-between">
+      <div>
+        <p className="font-serif text-xl font-semibold">🎟️ Ofereça cupons no Clube do Bem</p>
+        <p className="mt-1 text-sm leading-relaxed text-suave">
+          {deNovo
+            ? "A liberação do seu negócio não está valendo. Veja o motivo e peça a verificação de novo."
+            : "Verifique o seu negócio com o CNPJ para criar ofertas de desconto no perfil. É de graça."}
+        </p>
+      </div>
+      <Link href={`/painel/${username}/clube#verificar`} className="botao-coral botao-pequeno whitespace-nowrap">
+        Verificar meu negócio
+      </Link>
     </div>
   );
 }

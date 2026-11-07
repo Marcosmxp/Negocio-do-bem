@@ -141,6 +141,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
               <nav aria-label="Para negócios" className="space-y-2.5">
                 <p className="font-display text-xl font-bold uppercase">Para negócios</p>
                 <Link href="/sobre#dono" className={`block w-fit ${LINK_DO_RODAPE}`}>Reivindicar meu perfil</Link>
+                <Link href="/clube-do-bem" className={`block w-fit ${LINK_DO_RODAPE}`}>Clube do Bem</Link>
                 <Link href="/sobre#privacidade" className={`block w-fit ${LINK_DO_RODAPE}`}>Privacidade e remoção</Link>
               </nav>
             </div>

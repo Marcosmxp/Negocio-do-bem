@@ -507,6 +507,19 @@ Desde a mudança para o Cloudflare, em 31/10, o site não carregava o Google Ana
 - **A variável era lida no build.** O `NEXT_PUBLIC_GA_ID` estava só na Vercel. O Next põe as variáveis `NEXT_PUBLIC_` no código durante o build, e a casca estática do layout também é gerada ali. No Cloudflare, ela precisa estar nas variáveis de build da produção (Workers Builds), e não nas de runtime do Worker.
 - **Os previews continuam sem Analytics.** As variáveis de build dos previews ficam em outra aba do painel, sem o ID.
 
+### 1º de novembro: favoritos ([#248](https://github.com/fabs-reis/Negocio-do-bem/issues/248))
+
+É a primeira parte do Clube do Bem, em que negócios vão oferecer cupons por pouco tempo a quem chega pelo site. Favoritar o negócio vai ser a condição para gerar o cupom, então veio primeiro. As regras estão em [Favoritos](regras-de-negocio.md#favoritos).
+
+- **Dentro do site, não no Instagram.** O site não lê o Instagram, então não teria como saber quem segue quem lá. Dentro do site, a condição do cupom pode ser conferida.
+- **Coração, e não "Seguir".** O PR começou com um botão "Seguir" e trocou pelo coração antes do merge: ele combina com o tom do projeto ("gosto deste negócio e quero apoiar") e cabe no canto dos cards, então dá para favoritar direto do diretório. No perfil, o coração vem com o texto "Favoritar", para não ser lido como "curtir", que faria esperar um número de curtidas. Os avisos de ofertas, quando vierem, ficam num sininho à parte e desligado por padrão: quem favorita só pelo desconto não passa a receber notificação sem pedir.
+- **Sem sair da página.** O coração é um formulário com `useActionState`: o toque não recarrega a página nem a leva para o topo, o que importa no meio do diretório. Como a ação é uma Server Action, o React envia o formulário mesmo antes de o JavaScript da página carregar.
+- **O número aparece no perfil, mas não vira ranking.** O perfil mostra quantas pessoas favoritaram, como prova de que a comunidade gosta do negócio, e nada aparece com zero, para um negócio novo não ficar exposto. O número fica fora dos cards e não muda a ordem do diretório: aí um negócio ganharia destaque só por ter mais favoritos. Ninguém vê quem favoritou, nem o dono: o clube não entrega lista de clientes.
+- **Negócio sem dono também pode ser favoritado.** Quando o dono assumir o perfil, já encontra pessoas que gostam do negócio, e isso é um bom motivo para ele reivindicar.
+- **Sem e-mail confirmado.** Favoritar não publica nada, então só precisa de login.
+- **A página é `/favoritos`, e não `/painel/favoritos`.** Dentro de `/painel`, um caminho fixo esconderia o painel de um negócio cujo @ fosse `favoritos`, porque `/painel/<@>` é o painel de cada negócio.
+- **Duas migrações.** A tabela nasceu como `EmpresaSeguidor` e já tinha chegado ao banco dos previews quando virou `EmpresaFavorita`. Por isso a segunda migração só renomeia a tabela, em vez de editar a primeira.
+
 ### 2 de novembro: embaixadores do bem ([#250](https://github.com/fabs-reis/Negocio-do-bem/issues/250))
 
 Influenciadores que levam o projeto para a cidade ou o estado deles ganharam uma faixa na página inicial, a página `/embaixadores` e um bloco na página da cidade. O visual foi combinado num canvas antes do código. As regras estão em [Embaixadores do bem](regras-de-negocio.md#19-embaixadores-do-bem).
@@ -539,6 +552,51 @@ O perfil só contava quem é o negócio, em texto simples e com os botões todos
 - **Negócios parecidos** da mesma cidade no fim da página (`negociosParecidos`).
 - **O que está vazio some:** nenhum bloco em branco para o visitante.
 
+### 6 de novembro: liberação para o Clube do Bem ([#248](https://github.com/fabs-reis/Negocio-do-bem/issues/248))
+
+Para criar ofertas com cupom, ser dono não basta: qualquer conta assume um perfil sem dono na hora, e um cupom num negócio assumido por outra pessoa vira golpe ("pague pelo Pix para garantir o desconto"). As regras estão em [Clube do Bem](regras-de-negocio.md#20-clube-do-bem).
+
+- **Só CNPJ, por enquanto.** O CNPJ dá uma ficha pública na Receita, com a situação e o quadro de sócios. A moderação vê se o negócio existe, se está ativo e se o nome da conta bate com um sócio. Autônomos sem CNPJ e profissões regulamentadas precisam de outro caminho (vídeo, indicação de embaixador, registro no conselho) e ficaram para depois.
+- **A moderação libera, o dono não pede.** O lançamento é com donos convidados, e a moderação conversa com cada um. O pedido feito pelo próprio dono, com um código na bio do Instagram, fica para quando o clube abrir.
+- **A ficha não é guardada.** É consultada na hora, a cada vez. A razão social do MEI traz o CPF da pessoa, então nem a auditoria leva a razão social: só o @, o nome da conta e o CNPJ.
+- **Por dono, e só enquanto for dono.** A liberação não passa para outro dono do mesmo negócio, e quem perde o perfil numa transferência perde a liberação sem precisar de outra ação.
+
+
+### 6 de novembro: ofertas e cupons do Clube do Bem ([#248](https://github.com/fabs-reis/Negocio-do-bem/issues/248))
+
+Com a liberação pronta, o dono liberado cria uma oferta curta, quem visita gera o cupom e o dono valida no balcão. As regras estão em [Clube do Bem](regras-de-negocio.md#20-clube-do-bem).
+
+- **Prazo curto e sem edição.** Até 15 dias, terminando às 23h59 de Brasília. Uma oferta publicada obriga o negócio a cumprir (CDC, art. 30), então ela não muda depois de criada: o dono encerra e cria outra. Quem já gerou o cupom usa até o fim previsto.
+- **Desconto livre.** O plano previa revisar na moderação as ofertas acima de 50%; sem a fila de revisão, a primeira versão travou o desconto em 50%. Em 06/11 ficou decidido deixar o valor livre (até 100%, ou qualquer valor em reais): quem conhece o negócio é o dono, e as proteções contra golpe estão no texto da oferta, no aviso contra Pix e na suspensão quando o contato muda.
+- **O texto não leva contato nem pagamento.** Link, telefone, e-mail, documento e "Pix" são recusados no título e nas condições, e todo cupom repete que o site nunca pede Pix. O golpe mais provável no clube é pedir pagamento antecipado "para garantir o desconto".
+- **Trocar o contato suspende o clube.** É o outro lado do golpe: assumir um perfil, trocar o WhatsApp e lançar um cupom. A suspensão automática usa a mesma liberação da moderação, que confere de novo antes de liberar.
+- **Concorrência pelo banco.** O último cupom e a validação dupla se resolvem com UPDATE condicional (`cuponsGerados < limite`, `usadoEm IS NULL`), e a oferta única por negócio com `SELECT ... FOR UPDATE` na linha do negócio. Os testes disparam os pedidos ao mesmo tempo.
+- **Gerar o cupom favorita.** É a condição combinada na issue, num toque só, e o botão avisa antes.
+- **O dono vê só o primeiro nome** de quem gerou o cupom, para conferir no balcão. O clube não entrega lista de clientes.
+- **O coração acompanha o servidor.** Gerar o cupom favorita o negócio e volta ao mesmo perfil, só com o `?aviso=`. O coração guardava o próprio estado (`useActionState`) e continuava vazio; agora ele recomeça quando o valor que vem do servidor muda (uma `key` com o estado).
+- **Ficou para depois:** o filtro "Com cupom" no diretório (o selo nos cards já mostra), o QR code, o e-mail com "Repetir oferta" e a denúncia de oferta.
+
+### 6 de novembro: a página do Clube do Bem ([#284](https://github.com/fabs-reis/Negocio-do-bem/issues/284))
+
+Sem uma explicação, o dono não sabia como criar a oferta nem conferir o cupom, e quem compra não sabia que precisava de conta nem que o negócio vê o primeiro nome. `/clube-do-bem` é um passo a passo com prints, no formato do `/instalacao`.
+
+- **Dois caminhos na mesma página.** "Quero usar um cupom" e "Tenho um negócio" levam às duas seções. Numa página só, quem compra também vê como o dono confere o cupom, e o dono vê o que o cliente vê.
+- **Prints de verdade, ao contrário do `/instalacao`.** As telas são as do próprio site, que a gente controla, então não envelhecem com uma versão do sistema. Foram tiradas no tamanho de celular (390 px, densidade 2) com o Chrome sem janela, com os dados de exemplo do seed, e ficam em `public/prints/clube-do-bem/` em WebP (cerca de 350 KB ao todo). Largura e altura de cada uma estão na página, para nada pular enquanto carrega. A pasta não se chama `clube-do-bem` para não disputar o endereço com a página.
+- **`Passo` e `Passos` foram para `src/components/Passos.tsx`,** para servir aos dois tutoriais. Na página do clube, o título do passo é `h3`, porque as seções já usam `h2`.
+- **Mudou a tela, troque o print.** O texto cita os botões pelo nome ("Favoritar e gerar cupom", "Marcar como usado"), e as regras citadas (15 dias, primeiro nome, contato trocado) são as da [seção 20](regras-de-negocio.md#20-clube-do-bem).
+
+
+### 6 de novembro: o dono pede a verificação do Clube do Bem ([#286](https://github.com/fabs-reis/Negocio-do-bem/issues/286))
+
+Antes, a moderação precisava conseguir o CNPJ com cada dono e digitar na ficha do negócio. Agora o dono informa o CNPJ no painel, e o pedido cai numa fila da moderação, que já abre com a ficha da Receita. As regras estão em [Liberação para o clube](regras-de-negocio.md#liberação-para-o-clube).
+
+- **Sem migração.** O pedido usa a mesma linha da liberação (`LiberacaoClube`), com dois status novos, "pendente" e "recusada". O `status` já era texto, e o `decididoEm` passou a ser a data da última mudança. Assim, cada dono continua com uma linha por negócio, e liberar um pedido é o mesmo `upsert` de antes.
+- **A Receita barra cedo, mas não trava.** Um CNPJ que a Receita diz não estar ativo nem entra na fila. Se a BrasilAPI não responde, o pedido entra assim mesmo: a moderação consulta de novo antes de liberar, e a liberação continua exigindo a Receita.
+- **O motivo de antes fica.** Quem foi recusado ou suspenso pede de novo, e o motivo da última decisão continua na linha, para a moderação ver ("Da última vez: …"). Um golpista suspenso que pede de novo aparece com o motivo da suspensão.
+- **A ficha da Receita virou um componente** (`src/app/moderacao/FichaDaReceita.tsx`), usado na fila e na ficha do negócio. Na fila, "Liberar" e "Recusar" voltam para a fila (`voltar=fila`).
+- **O dono não vê a ficha.** Ele só fica sabendo se o CNPJ está ativo. O quadro de sócios e a comparação do nome continuam só com a moderação.
+- **CNPJ inexistente é recusado na hora.** `buscarNaReceita` separa o 404 da BrasilAPI ("Não achamos este CNPJ na Receita") da consulta que falhou, que deixa o pedido entrar. O `consultarCnpj` continua devolvendo `null` nos dois casos, para quem já o usava.
+- **A página `/clube-do-bem` mudou junto:** o passo 1 do dono troca o aviso de "fase de convite" por três prints, com a caixa do painel, o formulário do CNPJ e o pedido em análise. O CNPJ dos prints (12.345.678/9999-66) tem os dígitos certos e não existe na Receita.
 ---
 
 ## 4. Arquitetura
@@ -573,7 +631,11 @@ O e-mail nunca dá permissão, nem depois de confirmado: as contas antigas não 
 
 Toda resposta leva cabeçalhos de segurança (`headers()` no `next.config.ts`):
 
-- **`Content-Security-Policy`:** scripts, estilos, imagens e conexões só do próprio site e do Google Analytics. As imagens podem vir também do domínio das fotos no R2 (`NEXT_PUBLIC_R2_PUBLIC_URL`). Nos previews, também do `vercel.live`, a barra de comentários do Vercel. `frame-ancestors 'none'` impede que outro site embuta as páginas num iframe (clickjacking), e `form-action 'self'` impede formulários de enviar dados para fora.
+- **`Content-Security-Policy`:** scripts, estilos, imagens e conexões só do próprio site, do Google Analytics e do Cloudflare Web Analytics.
+  - **Google Analytics:** o `connect-src` libera também `*.google.com`, porque o GA4 manda parte dos envios para `www.google.com/g/collect`. O [guia de CSP do Google](https://developers.google.com/tag-platform/security/guides/csp) pede isso mesmo sem os recursos de anúncios.
+  - **Cloudflare Web Analytics:** o script `static.cloudflareinsights.com` e os envios para `cloudflareinsights.com`. O Cloudflare injeta esse script na resposta, e sem a liberação o navegador o barrava em todas as páginas (issue #289).
+  - **Fotos e previews:** as imagens podem vir também do domínio das fotos no R2 (`NEXT_PUBLIC_R2_PUBLIC_URL`). Nos previews, também do `vercel.live`, a barra de comentários do Vercel.
+  - **Embutir e enviar para fora:** `frame-ancestors 'none'` impede que outro site embuta as páginas num iframe (clickjacking), e `form-action 'self'` impede formulários de enviar dados para fora.
 - **Sem nonce:** a CSP aceita scripts inline (`'unsafe-inline'`), como o script do tema no `layout.tsx` e os do próprio Next. Uma CSP com nonce obriga toda página a ser renderizada a cada acesso e é incompatível com o Partial Prerendering, que o projeto usa com o Cache Components. Ficaríamos sem pré-render e sem cache na CDN.
 - **`Strict-Transport-Security`** (2 anos), **`X-Frame-Options: DENY`** (para navegadores antigos), **`X-Content-Type-Options: nosniff`**, **`Referrer-Policy: strict-origin-when-cross-origin`** (sites abertos a partir do perfil não recebem o endereço completo) e **`Permissions-Policy`** (sem câmera, microfone, localização, pagamento, USB nem `browsing-topics`).
 
@@ -620,6 +682,8 @@ erDiagram
     Usuario ||--o{ Sessao : "tem"
     Usuario ||--o{ EmpresaMembro : "é dono via"
     Empresa ||--o{ EmpresaMembro : "tem donos"
+    Usuario ||--o{ EmpresaFavorita : "favorita"
+    Empresa ||--o{ EmpresaFavorita : "é favorita de"
     Empresa ||--o{ EmpresaCausa : "abraça"
     Empresa ||--o{ Depoimento : "recebe"
     Empresa ||--o{ Reivindicacao : "é pedida em"
@@ -640,10 +704,11 @@ Decisões do esquema:
   - uma conta do Google por conta do site (`googleId`);
   - um ID de conta do Instagram por negócio;
   - um depoimento por pessoa por negócio;
+  - um favorito por pessoa por negócio;
   - um código de DM único (só nos pedidos antigos).
 - **O que acontece ao apagar** (não há tela para isso hoje, só direto no banco):
-  - **uma conta:** apaga as sessões, os vínculos de dono, os pedidos de reivindicação e os depoimentos dela. Os negócios que ela indicou, as decisões que tomou e os registros de auditoria ficam, sem o autor;
-  - **um negócio:** apaga as causas, os donos, os depoimentos e os pedidos ligados a ele.
+  - **uma conta:** apaga as sessões, os vínculos de dono, os favoritos dela, os pedidos de reivindicação e os depoimentos dela. Os negócios que ela indicou, as decisões que tomou e os registros de auditoria ficam, sem o autor;
+  - **um negócio:** apaga as causas, os donos, os favoritos, os depoimentos e os pedidos ligados a ele.
 
 ---
 

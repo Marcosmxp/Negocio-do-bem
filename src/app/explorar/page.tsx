@@ -6,7 +6,8 @@ import { EmpresaCard, type EmpresaResumo } from "@/components/EmpresaCard";
 import { EmpresaLinha } from "@/components/EmpresaLinha";
 import { Paginacao } from "@/components/Paginacao";
 import { buscarCausa, CAUSAS, GRUPOS, type GrupoCausa } from "@/lib/causas";
-import { buscarDiretorio } from "@/lib/consultas";
+import { usuarioAtual } from "@/lib/auth/sessao";
+import { buscarDiretorio, coracoesDaLista } from "@/lib/consultas";
 import { recomendacaoPublica } from "@/lib/cortejo";
 import { alternar, hrefDiretorio, lerFiltros, mudarFiltro, ORDENS, tituloDoDiretorio, type FiltrosDiretorio, type Local, type Ordem } from "@/lib/diretorio";
 import { CATEGORIAS } from "@/lib/dominio";
@@ -44,10 +45,12 @@ export default function Explorar(props: PageProps<"/explorar">) {
 async function Diretorio({ searchParams }: Pick<PageProps<"/explorar">, "searchParams">) {
   const filtros = lerFiltros(await searchParams);
   const resultado = await buscarDiretorio(filtros);
+  const coracoes = await coracoesDaLista(await usuarioAtual(), resultado.itens.map((empresa) => empresa.id), hrefDiretorio(filtros));
   const ativos = filtrosAtivos(filtros, resultado.local);
   const marcados = filtros.tipos.length + filtros.causas.length + Number(filtros.verificados);
-  // Só a apresentação pública chega aos componentes, sem ids privados nem a história inteira.
+  // Só os dados usados pelo cartão chegam aos componentes, sem a história inteira.
   const negocios: EmpresaResumo[] = resultado.itens.map((empresa) => ({
+    id: empresa.id,
     instagramUsername: empresa.instagramUsername,
     nome: empresa.nome,
     fotoUrl: empresa.fotoUrl,
@@ -58,6 +61,7 @@ async function Diretorio({ searchParams }: Pick<PageProps<"/explorar">, "searchP
     status: empresa.status,
     causas: empresa.causas,
     _count: empresa._count,
+    ofertas: empresa.ofertas,
     recomendacao: recomendacaoPublica({ historia: empresa.historia, motivoIndicacao: empresa.motivoIndicacao, indicadaPor: null }),
   }));
 
@@ -109,7 +113,7 @@ async function Diretorio({ searchParams }: Pick<PageProps<"/explorar">, "searchP
         <ol key={hrefDiretorio(filtros)} className="cortejo-guia-lista" aria-label="Negócios encontrados">
           {negocios.map((empresa, indice) => (
             <li key={empresa.instagramUsername} style={{ "--atraso": `${Math.min(indice, 5) * 35}ms` } as CSSProperties}>
-              {filtros.vista === "lista" ? <EmpresaLinha empresa={empresa} /> : <EmpresaCard empresa={empresa} />}
+              {filtros.vista === "lista" ? <EmpresaLinha empresa={empresa} favorito={coracoes(empresa.id)} /> : <EmpresaCard empresa={empresa} favorito={coracoes(empresa.id)} />}
             </li>
           ))}
         </ol>

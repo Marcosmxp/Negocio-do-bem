@@ -1,6 +1,7 @@
 import type { CSSProperties } from "react";
 import Link from "next/link";
 import { CausaBadge } from "@/components/CausaBadge";
+import { CoracaoFavorito, type EstadoFavorito } from "@/components/CoracaoFavorito";
 import { Monograma } from "@/components/Monograma";
 import { SeloStatus } from "@/components/SeloStatus";
 import { filtrarCausas } from "@/lib/causas";
@@ -9,6 +10,7 @@ import { temInstagram } from "@/lib/endereco";
 import { ehFotoDoSite } from "@/lib/fotos";
 
 export type EmpresaResumo = {
+  id: string;
   instagramUsername: string;
   nome: string;
   fotoUrl: string | null;
@@ -20,12 +22,17 @@ export type EmpresaResumo = {
   causas: { causa: string }[];
   _count: { depoimentos: number };
   recomendacao?: Recomendacao | null;
+  // A oferta do Clube do Bem que está valendo, se houver (o selo de cupom).
+  ofertas?: { id: string }[];
 };
 
 const MAX_BADGES = 3;
 
-/** Uma apresentação do negócio, com a voz da comunidade quando ela é pública. */
-export function EmpresaCard({ empresa, compacta = false }: { empresa: EmpresaResumo; compacta?: boolean }) {
+/**
+ * Uma apresentação do negócio, com a voz da comunidade quando ela é pública.
+ * Com `favorito`, o coração fica ao lado do nome, fora de todo link (um botão não pode ficar dentro de um link).
+ */
+export function EmpresaCard({ empresa, compacta = false, favorito }: { empresa: EmpresaResumo; compacta?: boolean; favorito?: EstadoFavorito }) {
   const causas = filtrarCausas(empresa.causas.map((c) => c.causa));
   const depoimentos = empresa._count.depoimentos;
   const href = `/empresas/${empresa.instagramUsername}`;
@@ -52,12 +59,17 @@ export function EmpresaCard({ empresa, compacta = false }: { empresa: EmpresaRes
         </Link>
 
         <div className="min-w-0">
-          <h3 className={`font-display leading-[1.08] font-extrabold tracking-tight line-clamp-2 [overflow-wrap:anywhere] ${compacta ? "text-xl sm:text-2xl" : "text-2xl @min-[34rem]:text-[2rem]"}`}>
-            <Link href={href} className="decoration-[var(--tinta-negocio)] decoration-2 underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-tinta">
-              {empresa.nome}
-            </Link>
-          </h3>
-          {temInstagram(empresa.instagramUsername) && <p className="truncate text-sm text-suave">@{empresa.instagramUsername}</p>}
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <h3 className={`font-display leading-[1.08] font-extrabold tracking-tight line-clamp-2 [overflow-wrap:anywhere] ${compacta ? "text-xl sm:text-2xl" : "text-2xl @min-[34rem]:text-[2rem]"}`}>
+                <Link href={href} className="decoration-[var(--tinta-negocio)] decoration-2 underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-tinta">
+                  {empresa.nome}
+                </Link>
+              </h3>
+              {temInstagram(empresa.instagramUsername) && <p className="truncate text-sm text-suave">@{empresa.instagramUsername}</p>}
+            </div>
+            {favorito && <CoracaoFavorito estado={favorito} nome={empresa.nome} className="shrink-0" />}
+          </div>
           <p className="mt-2 text-sm leading-relaxed text-suave [overflow-wrap:anywhere]">
             <span className="font-semibold text-[var(--texto-negocio)]">{empresa.cidade}, {empresa.uf}</span>
             <span className="mx-2" aria-hidden="true">·</span>
@@ -90,6 +102,9 @@ export function EmpresaCard({ empresa, compacta = false }: { empresa: EmpresaRes
         <div className="col-span-full flex min-w-0 flex-wrap items-center justify-between gap-x-5 gap-y-3 @min-[34rem]:col-start-2">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
             <SeloStatus status={empresa.status} />
+            {!!empresa.ofertas?.length && (
+              <span className="rounded-full bg-coral-50 px-2.5 py-1 text-xs font-semibold text-coral-700">🎟️ Cupom</span>
+            )}
             {depoimentos > 0 && <span className="text-xs text-suave">{depoimentos} {depoimentos === 1 ? "depoimento" : "depoimentos"}</span>}
           </div>
           <Link href={href} className="inline-flex items-center gap-2 text-sm font-bold text-[var(--texto-negocio)] underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-tinta">

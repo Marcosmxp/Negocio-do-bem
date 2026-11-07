@@ -43,6 +43,9 @@ describe("contraste dos controles", () => {
       for (const paleta of [claro, escuro]) expect(contraste(paleta[`${tinta}-texto`], paleta.superficie)).toBeGreaterThanOrEqual(4.5);
     }
   });
+  it("os selos de cupom e de parceiro do clube leem bem sobre o fundo coral claro nos dois temas", () => {
+    for (const paleta of [claro, escuro]) expect(contraste(paleta["terracota-texto"], paleta["coral-50"])).toBeGreaterThanOrEqual(4.5);
+  });
   it("o seletor de estilo do editor usa a borda funcional", () => {
     expect(editor.match(/<select[\s\S]*?<\/select>/)![0]).toContain("border-borda-controle");
   });

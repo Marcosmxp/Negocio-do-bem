@@ -27,6 +27,12 @@ export async function MenuUsuario() {
         <Link href="/painel" className="block rounded-xl px-3 py-2 font-medium hover:bg-papel">
           Meu painel
         </Link>
+        <Link href="/favoritos" className="block rounded-xl px-3 py-2 font-medium hover:bg-papel">
+          Favoritos
+        </Link>
+        <Link href="/cupons" className="block rounded-xl px-3 py-2 font-medium hover:bg-papel">
+          Meus cupons
+        </Link>
         {usuario.moderador && (
           <Link href="/moderacao" className="block rounded-xl px-3 py-2 font-medium hover:bg-papel">
             Moderação
