@@ -5,6 +5,7 @@ import { RostoNaFaixa } from "@/components/FaixaEmbaixadores";
 import type { EmbaixadorNoSite } from "@/lib/embaixadores";
 
 const faixaRolante = readFileSync(new URL("../../src/components/FaixaRolante.tsx", import.meta.url), "utf8");
+const estilos = readFileSync(new URL("../../src/app/globals.css", import.meta.url), "utf8");
 
 const embaixador: EmbaixadorNoSite = {
   id: "e1",
@@ -45,11 +46,25 @@ describe("faixa dos embaixadores", () => {
     expect(html).toContain('href="/cidades/recife-pe"');
   });
 
+  it("o teclado pode alcançar os originais sem ficar preso na animação", () => {
+    expect(faixaRolante).toContain('className="faixa-originais flex gap-4 pr-4"');
+    expect(estilos).toContain(".faixa-janela:has(.faixa-originais :focus-visible)");
+    expect(estilos).toMatch(/:has\(\.faixa-originais :focus-visible\) \.faixa-rolando \{\s*animation: none;/);
+    expect(estilos).toMatch(/:has\(\.faixa-originais :focus-visible\) \{\s*overflow-x: auto;/);
+  });
+
+  it("remede a largura quando o conteúdo muda sem redimensionar a janela", () => {
+    expect(faixaRolante).toContain("observador.observe(janela.current)");
+    expect(faixaRolante).toContain("observador.observe(lista.current)");
+  });
+
   it("a cópia fica fora do leitor de tela, mas continua clicável", () => {
     // Com inert, os rostos repetidos não abriam nada, e boa parte da faixa na tela é a cópia.
     const copia = faixaRolante.match(/<ul[^>]*aria-hidden="true"[^>]*>[\s\S]*?<\/ul>/)?.[0];
     expect(copia).toBeDefined();
     expect(copia).not.toMatch(/\binert\b/);
     expect(copia).toContain("{copia}");
+    expect(copia).toContain("onMouseDown");
+    expect(copia).toContain("evento.preventDefault()");
   });
 });
