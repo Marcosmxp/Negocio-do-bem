@@ -84,16 +84,26 @@ async function pastaLocalSegura(pasta: "perfis" | "historias"): Promise<boolean>
   }
 }
 
-async function inventariarFotos(pasta: "perfis" | "historias"): Promise<Map<string, string>> {
+type IdentidadeArquivo = { dev: number; ino: number };
+
+async function inventariarFotos(pasta: "perfis" | "historias") {
   const objetos = new Map<string, string>();
+  const identidades = new Map<string, IdentidadeArquivo>();
   const diretorio = path.join(PASTA_LOCAL, pasta);
-  if (!await pastaLocalSegura(pasta)) return objetos;
+  if (!await pastaLocalSegura(pasta)) return { objetos, identidades };
+
   for (const arquivo of await readdir(diretorio, { withFileTypes: true })) {
     if (!arquivo.isFile()) continue;
     const url = identidadeDaFoto(`/enviados/${pasta}/${arquivo.name}`);
-    if (url) objetos.set(url, path.join(diretorio, arquivo.name));
+    if (!url) continue;
+
+    const destino = path.join(diretorio, arquivo.name);
+    const info = await lstat(destino);
+    if (!info.isFile()) continue;
+    objetos.set(url, destino);
+    identidades.set(url, { dev: info.dev, ino: info.ino });
   }
-  return objetos;
+  return { objetos, identidades };
 }
 
 async function abrirPastaParaExclusao(): Promise<FileHandle> {
@@ -121,7 +131,11 @@ async function abrirPastaParaExclusao(): Promise<FileHandle> {
   }
 }
 
-async function excluirObjeto(url: string, objetos: Map<string, string>): Promise<void> {
+async function excluirObjeto(
+  url: string,
+  objetos: Map<string, string>,
+  identidades: Map<string, IdentidadeArquivo>,
+): Promise<void> {
   const chave = objetoDaFoto(url).chave;
   if (!objetos.has(url) || !/^historias\/[a-f0-9]{24}\.(jpg|png|webp)$/.test(chave)) {
     throw new Error("A foto não pertence ao inventário deste armazenamento.");
@@ -131,7 +145,13 @@ async function excluirObjeto(url: string, objetos: Map<string, string>): Promise
   const destino = `/proc/self/fd/${pasta.fd}/${path.basename(chave)}`;
   try {
     try {
-      if (!(await lstat(destino)).isFile()) throw new Error("O destino da foto não é um arquivo regular.");
+      const atual = await lstat(destino);
+      if (!atual.isFile()) throw new Error("O destino da foto não é um arquivo regular.");
+      const esperada = identidades.get(url);
+      // Uma substituição posterior ao inventário não autoriza apagar o novo inode.
+      if (!esperada || atual.dev !== esperada.dev || atual.ino !== esperada.ino) {
+        throw new Error("A foto mudou desde o inventário; descarte recusado.");
+      }
       await unlink(destino);
     } catch (erro) {
       if (!(typeof erro === "object" && erro !== null && "code" in erro && erro.code === "ENOENT")) throw erro;
@@ -181,7 +201,10 @@ export async function limparFotosHistorias(selecionadas: string[] = [], aplicar 
   }
   const inventario = remoto
     ? await (await import("@/lib/r2-administracao")).prepararInventarioHistoriasR2(aplicar, [...aposentadas])
-    : await inventariarFotos("historias").then((objetos) => ({ objetos, excluir: (url: string) => excluirObjeto(url, objetos) }));
+    : await inventariarFotos("historias").then(({ objetos, identidades }) => ({
+      objetos,
+      excluir: (url: string) => excluirObjeto(url, objetos, identidades),
+    }));
   const urls = selecionadas.length ? selecionadas.map(identidadeDaFoto) : [...inventario.objetos.keys()];
   for (const url of urls) {
     if (url && inventario.objetos.has(url)) continue;
