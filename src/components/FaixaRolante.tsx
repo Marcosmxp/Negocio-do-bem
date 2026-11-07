@@ -59,8 +59,10 @@ export function FaixaRolante({
             <ul
               className="flex gap-4 pr-4 motion-reduce:hidden"
               aria-hidden="true"
-              // O clique deve navegar sem deixar o foco num elemento oculto ao leitor de tela.
-              onMouseDown={(evento) => evento.preventDefault()}
+              onMouseDown={(evento) => {
+                // Não mover o foco para links ocultos ao leitor de ecrã durante o clique.
+                evento.preventDefault();
+              }}
             >
               {copia}
             </ul>
