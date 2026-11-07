@@ -284,6 +284,16 @@ body {
 .faixa-mascara {
   mask-image: linear-gradient(to right, transparent, #000 3rem, #000 calc(100% - 3rem), transparent);
 }
+/* A lista original é a única no Tab. Quando o teclado entra, mostramos os links
+   sem transformação e deixamos o navegador deslocar até ao link focado. O uso de
+   :focus-visible evita interromper os cliques dos utilizadores do rato na cópia. */
+.faixa-janela:has(.faixa-originais :focus-visible) {
+  overflow-x: auto;
+  mask-image: none;
+}
+.faixa-janela:has(.faixa-originais :focus-visible) .faixa-rolando {
+  animation: none;
+}
 @media (prefers-reduced-motion: reduce) {
   .faixa-rolando {
     animation: none;

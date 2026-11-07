@@ -39,6 +39,8 @@ export function FaixaRolante({
     medir();
     const observador = new ResizeObserver(medir);
     if (janela.current) observador.observe(janela.current);
+    // As fontes e o conteúdo podem alterar a largura sem redimensionar a janela.
+    if (lista.current) observador.observe(lista.current);
     return () => observador.disconnect();
   }, []);
 
@@ -50,11 +52,18 @@ export function FaixaRolante({
           style={{ "--duracao-da-faixa": `${itens.length * segundosPorItem}s` } as CSSProperties}
           data-pausada={pausada || undefined}
         >
-          <ul ref={lista} className="flex gap-4 pr-4">
+          <ul ref={lista} className="faixa-originais flex gap-4 pr-4">
             {itens}
           </ul>
           {rolando && (
-            <ul className="flex gap-4 pr-4 motion-reduce:hidden" aria-hidden="true">
+            <ul
+              className="flex gap-4 pr-4 motion-reduce:hidden"
+              aria-hidden="true"
+              onMouseDown={(evento) => {
+                // Não mover o foco para links ocultos ao leitor de ecrã durante o clique.
+                evento.preventDefault();
+              }}
+            >
               {copia}
             </ul>
           )}
