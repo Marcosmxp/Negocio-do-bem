@@ -52,6 +52,7 @@ next-env.d.ts
 
 # fotos enviadas em desenvolvimento (em produção vão para o Cloudflare R2)
 /public/enviados/
+/.documentos-privados/
 
 # Arquivos gerados pelo build Cloudflare.
 /prisma/schema.cloudflare.prisma
