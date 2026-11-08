@@ -119,20 +119,25 @@ export async function exigirUsuario(voltarPara: string): Promise<UsuarioSessao> 
   return usuario;
 }
 
-/** Nunca concede moderação baseada apenas no login primário. */
-export async function exigirModerador(): Promise<UsuarioSessao> {
+/** Preserva a resposta segura para Server Actions sem JavaScript da stage. */
+export async function exigirModerador(contexto: "pagina" | "acao" = "pagina"): Promise<UsuarioSessao> {
   const sessao = await sessaoAtual();
-  if (!sessao) redirect("/entrar?voltar=%2Fmoderacao");
-  if (!ehModerador(sessao.usuario)) notFound();
+  if (!sessao || !ehModerador(sessao.usuario)) {
+    if (contexto === "acao") redirect("/404");
+    notFound();
+  }
   if (sessao.usuario.mfaAtivadoEm === null || sessao.mfaVerificadoEm === null) {
     redirect("/seguranca/mfa?voltar=%2Fmoderacao");
   }
   return (await usuarioAtual())!;
 }
 
-/** Exige MFA recente (step-up) antes de decisões administrativas de grande impacto. */
-export async function exigirModeradorRecente(voltarPara = "/moderacao"): Promise<UsuarioSessao> {
-  const moderador = await exigirModerador();
+/** Exige MFA renovado em menos de cinco minutos para decisões de alto impacto. */
+export async function exigirModeradorRecente(
+  contexto: "pagina" | "acao" = "acao",
+  voltarPara = "/moderacao",
+): Promise<UsuarioSessao> {
+  const moderador = await exigirModerador(contexto);
   const sessao = await sessaoAtual();
   if (!sessao?.mfaVerificadoEm || Date.now() - sessao.mfaVerificadoEm.getTime() >= REAUTENTICACAO_MS) {
     redirect("/seguranca/mfa?revalidar=1&voltar=" + encodeURIComponent(caminhoSeguro(voltarPara, "/moderacao")));

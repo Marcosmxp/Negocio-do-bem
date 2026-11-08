@@ -54,4 +54,17 @@ describe("MFA RFC 6238 e segredos", () => {
     }
     expect(hashCodigoRecuperacao("123")).toBeNull();
   });
+  it("rejeita chaves base64 não canônicas e valores malformados", () => {
+    const segredo = gerarSegredoMfa();
+    const canonica = Buffer.alloc(32, 7).toString("base64");
+    vi.stubEnv("MFA_ENCRYPTION_KEY", canonica + "!");
+    try {
+      expect(() => criptografarSegredoMfa(segredo)).toThrow(/base64/);
+      vi.stubEnv("MFA_ENCRYPTION_KEY", "abc");
+      expect(() => criptografarSegredoMfa(segredo)).toThrow(/base64/);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
 });

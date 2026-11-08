@@ -14,9 +14,11 @@ export function configuracaoMfaValida(iniciadaEm: Date | null, agora = new Date(
 }
 
 function chaveDeCriptografia(): Buffer {
-  const valor = process.env.MFA_ENCRYPTION_KEY;
-  const chave = Buffer.from(valor ?? "", "base64");
-  if (chave.length !== 32) throw new Error("MFA_ENCRYPTION_KEY deve conter 32 bytes codificados em base64.");
+  const valor = process.env.MFA_ENCRYPTION_KEY ?? "";
+  const chave = Buffer.from(valor, "base64");
+  if (chave.length !== 32 || chave.toString("base64") !== valor) {
+    throw new Error("MFA_ENCRYPTION_KEY deve conter 32 bytes em base64 canônico.");
+  }
   return chave;
 }
 

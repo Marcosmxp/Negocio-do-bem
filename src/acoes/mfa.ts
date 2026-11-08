@@ -172,7 +172,13 @@ export async function validarSegundoFator(_estado: EstadoMfa, dados: FormData): 
       return false;
     }
     const { count: atualizada } = await tx.sessao.updateMany({
-      where: { id: sessao.id, usuarioId: sessao.usuarioId },
+      where: {
+        id: sessao.id,
+        usuarioId: sessao.usuarioId,
+        expiraEm: { gt: agora },
+        criadoEm: { gt: new Date(agora.getTime() - 8 * 60 * 60_000) },
+        ultimaAtividadeEm: { gt: new Date(agora.getTime() - 15 * 60_000) },
+      },
       data: { mfaVerificadoEm: agora, tentativasMfa: 0 },
     });
     if (!atualizada) throw new Error("Sessão terminada durante a autenticação.");
