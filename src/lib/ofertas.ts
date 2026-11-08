@@ -132,6 +132,11 @@ export function condicaoDeOfertaAtiva(agora = new Date()) {
   return { status: "ativa", fim: { gt: agora } } satisfies Prisma.OfertaWhereInput;
 }
 
+/** A oferta ativa de um negócio que o público vê: aprovado e fora do modo oculto, como no perfil. Alimenta a lista de /cupons. */
+export function condicaoDeOfertaPublica(agora = new Date()) {
+  return { ...condicaoDeOfertaAtiva(agora), empresa: { moderacao: "aprovada", oculta: false } } satisfies Prisma.OfertaWhereInput;
+}
+
 export class ErroOferta extends Error {
   constructor(readonly mensagem: string) {
     super(mensagem);
@@ -305,6 +310,18 @@ export function contatoMudou(
   return campos.some((campo) => (antes[campo] || null) !== (depois[campo] || null));
 }
 
+/** Suspende as ofertas do negócio cujos cupons ainda valem: as ativas e as encerradas antes do fim. */
+export function suspenderOfertasQueValem(
+  tx: Prisma.TransactionClient,
+  where: Prisma.OfertaWhereInput,
+  agora = new Date(),
+) {
+  return tx.oferta.updateMany({
+    where: { ...where, status: { in: ["ativa", "encerrada"] }, fim: { gt: agora } },
+    data: { status: "suspensa" },
+  });
+}
+
 /**
  * O dono trocou o contato do perfil (ou o @, com `motivo`): as liberações do clube do negócio ficam suspensas e as
  * ofertas que estão valendo saem do ar, até a moderação conferir de novo. Fecha o golpe de
@@ -320,7 +337,7 @@ export async function suspenderPorContatoAlterado(
     data: { status: "suspensa", motivo, decididoPorId: null, decididoEm: new Date() },
   });
   if (count === 0) return;
-  await tx.oferta.updateMany({ where: { empresaId: empresa.id, status: "ativa" }, data: { status: "suspensa" } });
+  await suspenderOfertasQueValem(tx, { empresaId: empresa.id });
   await registrarAuditoria(tx, {
     usuarioId: null,
     acao: "clube.suspenso",

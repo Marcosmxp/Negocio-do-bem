@@ -14,6 +14,8 @@ import { EventosAnalytics } from "@/components/EventosAnalytics";
 import { InstalarApp } from "@/components/InstalarApp";
 import { Logo } from "@/components/Logo";
 import { MenuUsuario } from "@/components/MenuUsuario";
+import { NavegacaoMobile } from "@/components/NavegacaoMobile";
+import { ProtecaoDaBarra } from "@/components/ProtecaoDaBarra";
 import { ProtecaoDoMenu } from "@/components/ProtecaoDoMenu";
 import { RegistrarServiceWorker } from "@/components/RegistrarServiceWorker";
 import { REPOSITORIO } from "@/lib/dominio";
@@ -49,6 +51,8 @@ export const metadata: Metadata = {
 
 // Cor da barra do navegador no celular: o papel do tema claro ou do escuro.
 export const viewport: Viewport = {
+  // Sem isso o iPhone não informa a área do botão home, e a barra de baixo ficaria por cima dele.
+  viewportFit: "cover",
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#f7f0e3" },
     { media: "(prefers-color-scheme: dark)", color: "#17130f" },
@@ -94,22 +98,37 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
               <Link href="/sobre" className={`hidden sm:block ${LINK_DO_TOPO}`}>
                 Como funciona
               </Link>
-              <Link href="/participar" className={`px-2 sm:px-3 ${LINK_DO_TOPO}`}>
+              {/* No celular, a barra de baixo e a aba Conta cuidam do resto: o topo fica com a busca. */}
+              <Link
+                href="/explorar"
+                aria-label="Buscar negócios"
+                className="grid h-10 w-10 place-items-center rounded-full text-tinta/80 transition hover:bg-superficie hover:text-tinta focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-tinta sm:hidden"
+              >
+                <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
+                  <circle cx="11" cy="11" r="6.5" />
+                  <path d="M16 16l4.5 4.5" />
+                </svg>
+              </Link>
+              <Link href="/participar" className={`hidden sm:block ${LINK_DO_TOPO}`}>
                 Cadastrar
               </Link>
-              <AlternarTema />
-              <Suspense fallback={<div className="ml-1 h-8 w-[4.25rem] rounded-full bg-linha/70" />}>
-                <ProtecaoDoMenu>
-                  <MenuUsuario />
-                </ProtecaoDoMenu>
-              </Suspense>
+              <div className="hidden sm:block">
+                <AlternarTema />
+              </div>
+              <div className="hidden sm:block">
+                <Suspense fallback={<div className="ml-1 h-8 w-[4.25rem] rounded-full bg-linha/70" />}>
+                  <ProtecaoDoMenu>
+                    <MenuUsuario />
+                  </ProtecaoDoMenu>
+                </Suspense>
+              </div>
             </nav>
           </div>
         </header>
 
         <main className="flex-1">{children}</main>
 
-        <footer className="mt-24 bg-verde-escuro text-sobre-verde-escuro">
+        <footer className="mt-24 bg-verde-escuro text-sobre-verde-escuro max-sm:pb-24">
           <div className="mx-auto max-w-6xl px-4 pt-14 pb-10 sm:px-6 sm:pt-20">
             {/* Uma frase por linha: no celular, cada metade quebra sozinha e não sobra um "a" no fim. */}
             <p className="font-display text-[clamp(2.6rem,8vw,5.5rem)] leading-[0.9] font-extrabold uppercase">
@@ -147,6 +166,11 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             </div>
           </div>
         </footer>
+        <Suspense fallback={null}>
+          <ProtecaoDaBarra>
+            <NavegacaoMobile />
+          </ProtecaoDaBarra>
+        </Suspense>
         <AvisoSemConexao />
         <RegistrarServiceWorker />
         {ID_ANALYTICS && <EventosAnalytics />}
