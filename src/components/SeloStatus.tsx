@@ -1,8 +1,28 @@
 /**
- * O selo diz como o perfil está: indicado pela comunidade, assumido por uma conta
- * ou confirmado pelo Instagram do negócio (perfil oficial).
+ * O selo diz como o perfil está: indicado pela comunidade, assumido por uma conta,
+ * confirmado pelo Instagram do negócio (perfil oficial) ou conferido pela moderação no
+ * Clube do Bem (`verificado`, #293).
  */
-export function SeloStatus({ status, oficial }: { status: string; oficial: boolean }) {
+export function SeloStatus({
+  status,
+  oficial = false,
+  verificado = false,
+}: {
+  status: string;
+  oficial?: boolean;
+  verificado?: boolean;
+}) {
+  if (status === "verificada" && verificado) {
+    return (
+      <span
+        title="A moderação conferiu o CNPJ e a identidade de quem cuida deste perfil."
+        className="inline-flex items-center gap-1 rounded-full bg-folha-50 px-2.5 py-1 text-xs font-semibold text-folha"
+      >
+        <span aria-hidden="true">✓</span>
+        Perfil verificado
+      </span>
+    );
+  }
   if (status === "verificada" && oficial) {
     return (
       <span
