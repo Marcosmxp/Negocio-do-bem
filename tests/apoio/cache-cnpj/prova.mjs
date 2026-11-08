@@ -84,7 +84,7 @@ async function ler(caminho = fila, autenticado = true) {
 }
 function contar(cnpj) { return chamadas.filter(c => c.cnpj === cnpj).length; }
 function publico(marcador) {
-  return { razaoSocial: marcador, nomeFantasia: "Nome fictício", situacao: "ATIVA", municipio: "Recife", uf: "PE" };
+  return { razaoSocial: marcador, nomeFantasia: "Nome fictício", situacao: "ATIVA", municipio: "Recife", uf: "PE", socios: [], telefone: null, email: null };
 }
 function respostaBoa(marcador) { return { tipo: "sucesso", marcador }; }
 function atender(res, estado) {

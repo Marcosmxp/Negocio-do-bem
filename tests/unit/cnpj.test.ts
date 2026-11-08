@@ -20,10 +20,19 @@ vi.mock("react", () => ({
   },
 }));
 
-import { consultarCnpj } from "../../src/lib/cnpj";
+import { buscarNaReceita, consultarCnpj } from "../../src/lib/cnpj";
 
 const cnpj = "11222333000181";
-const padrao = { razaoSocial: "(sem razão social)", nomeFantasia: null, situacao: null, municipio: null, uf: null };
+const padrao = {
+  razaoSocial: "(sem razão social)",
+  nomeFantasia: null,
+  situacao: null,
+  municipio: null,
+  uf: null,
+  socios: [],
+  telefone: null,
+  email: null,
+};
 let fetchFalso: ReturnType<typeof vi.fn>;
 
 beforeEach(() => {
@@ -61,19 +70,38 @@ describe("consultarCnpj: projeção e contrato, sem simular persistência", () =
     },
   );
 
-  it("projeta só os cinco campos públicos e conserva acentos e caixa", async () => {
+  it("projeta só os campos públicos da ficha e conserva acentos e caixa", async () => {
     fetchFalso.mockResolvedValueOnce(new Response(JSON.stringify({
-      razao_social: "  Razão Ágil Ltda  ", nome_fantasia: "  Bem  ", descricao_situacao_cadastral: " ATIVA ",
-      municipio: " São Luís ", uf: " MA ", socios: ["não incluir"], telefone: "não incluir",
+      razao_social: "  Razão Ágil Ltda  ",
+      nome_fantasia: "  Bem  ",
+      descricao_situacao_cadastral: " ATIVA ",
+      municipio: " São Luís ",
+      uf: " MA ",
+      qsa: [
+        { nome_socio: "  Dora Dona  ", qualificacao_socio: " Sócia-Administradora ", cnpj_cpf_do_socio: " ***982247** " },
+        { nome_socio: "   ", qualificacao_socio: "Ignorado" },
+      ],
+      ddd_telefone_1: " 8133334444 ",
+      email: " CONTATO@BEM.COM.BR ",
+      socios: ["não incluir"],
+      telefone: "não incluir",
     })));
     expect(await consultarCnpj(cnpj)).toEqual({
-      razaoSocial: "Razão Ágil Ltda", nomeFantasia: "Bem", situacao: "ATIVA", municipio: "São Luís", uf: "MA",
+      razaoSocial: "Razão Ágil Ltda",
+      nomeFantasia: "Bem",
+      situacao: "ATIVA",
+      municipio: "São Luís",
+      uf: "MA",
+      socios: [{ nome: "Dora Dona", qualificacao: "Sócia-Administradora", cpfMascarado: "***982247**" }],
+      telefone: "8133334444",
+      email: "contato@bem.com.br",
     });
   });
 
   it.each([undefined, null, "", "  ", 0, false, [], {}].map(valor => ({ valor })))("mantém os padrões para campos não textuais ou vazios ($valor)", async ({ valor }) => {
     fetchFalso.mockResolvedValueOnce(new Response(JSON.stringify({
       razao_social: valor, nome_fantasia: valor, descricao_situacao_cadastral: valor, municipio: valor, uf: valor,
+      qsa: valor, ddd_telefone_1: valor, email: valor,
     })));
     expect(await consultarCnpj(cnpj)).toEqual(padrao);
   });
@@ -102,5 +130,25 @@ describe("consultarCnpj: projeção e contrato, sem simular persistência", () =
     } finally {
       timeout.mockRestore();
     }
+  });
+
+  it("consulta diretamente quando o cache incremental do Next não está presente", async () => {
+    camadas.persistente.mockRejectedValueOnce(new Error("Invariant: incrementalCache missing in unstable_cache"));
+    expect(await consultarCnpj(cnpj)).toEqual(padrao);
+    expect(fetchFalso).toHaveBeenCalledTimes(1);
+  });
+
+  it("buscarNaReceita separa 404 de falha de rede e de CNPJ inválido", async () => {
+    expect(await buscarNaReceita("11.222.333/0001-82")).toBeNull();
+    expect(fetchFalso).not.toHaveBeenCalled();
+
+    fetchFalso.mockResolvedValueOnce(new Response("{}", { status: 404 }));
+    expect(await buscarNaReceita(cnpj)).toBe("nao_encontrado");
+
+    fetchFalso.mockResolvedValueOnce(new Response("{}", { status: 502 }));
+    expect(await buscarNaReceita(cnpj)).toBeNull();
+
+    fetchFalso.mockResolvedValueOnce(new Response("{}"));
+    expect(await buscarNaReceita(cnpj)).toEqual(padrao);
   });
 });
