@@ -155,6 +155,21 @@ export async function criarOferta(empresaId: string, usuarioId: string, oferta: 
     if (!empresa || empresa.moderacao !== "aprovada" || empresa.oculta) {
       throw new ErroOferta("Seu negócio precisa estar no diretório para criar ofertas.");
     }
+    // A checagem anterior à transação é apenas um filtro rápido. A liberação pode
+    // ser suspensa enquanto esta transação aguarda a trava da empresa. As travas de
+    // leitura impedem que a suspensão ou a remoção do dono ultrapassem a criação.
+    const [autorizacao] = await tx.$queryRaw<{ status: string }[]>`
+      SELECT liberacao.status
+      FROM "LiberacaoClube" AS liberacao
+      INNER JOIN "EmpresaMembro" AS membro
+        ON membro."empresaId" = liberacao."empresaId"
+        AND membro."usuarioId" = liberacao."usuarioId"
+      WHERE liberacao."empresaId" = ${empresaId}
+        AND liberacao."usuarioId" = ${usuarioId}
+      FOR SHARE OF liberacao, membro`;
+    if (autorizacao?.status !== "liberada") {
+      throw new ErroOferta("Seu negócio ainda não foi liberado para o Clube do Bem, ou a liberação foi suspensa.");
+    }
     if (await tx.oferta.count({ where: { empresaId, ...condicaoDeOfertaAtiva() } })) {
       throw new ErroOferta("Já existe uma oferta valendo. Encerre a atual para criar outra.");
     }
