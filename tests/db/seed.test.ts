@@ -18,7 +18,7 @@ function executarSeed(ambiente = "development") {
 }
 
 async function limparBanco() {
-  await db.$executeRawUnsafe(`TRUNCATE "CadastroGoogle", "TentativaAcesso", "Usuario", "Empresa" CASCADE`);
+  await db.$executeRawUnsafe(`TRUNCATE "CadastroGoogle", "TentativaAcesso", "Embaixador", "Usuario", "Empresa" CASCADE`);
 }
 
 async function dadosDoBanco() {
@@ -29,6 +29,7 @@ async function dadosDoBanco() {
     donos: await db.empresaMembro.findMany({ orderBy: [{ empresaId: "asc" }, { usuarioId: "asc" }] }),
     depoimentos: await db.depoimento.findMany({ orderBy: { id: "asc" } }),
     pedidos: await db.reivindicacao.findMany({ orderBy: { id: "asc" } }),
+    embaixadores: await db.embaixador.findMany({ orderBy: { id: "asc" } }),
   };
 }
 
