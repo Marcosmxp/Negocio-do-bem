@@ -19,6 +19,8 @@ import { db } from "@/lib/db";
 
 export type EstadoMfa = { erro?: string; segredo?: string; codigos?: string[] } | undefined;
 
+class SessaoMfaExpirada extends Error {}
+
 async function contextoModerador() {
   const sessao = await sessaoAtual();
   if (!sessao) redirect("/entrar?voltar=%2Fseguranca%2Fmfa");
@@ -153,6 +155,7 @@ export async function validarSegundoFator(_estado: EstadoMfa, dados: FormData): 
   const periodo = validarCodigoMfa(descriptografarSegredoMfa(sessao.usuario.mfaSegredo), codigo);
   const recuperacaoHash = periodo === null ? hashCodigoRecuperacao(codigo) : null;
   const agora = new Date();
+  let sessaoExpirada = false;
   const valido = await db.$transaction(async (tx) => {
     if (periodo !== null) {
       const { count: consumido } = await tx.usuario.updateMany({
@@ -181,7 +184,7 @@ export async function validarSegundoFator(_estado: EstadoMfa, dados: FormData): 
       },
       data: { mfaVerificadoEm: agora, tentativasMfa: 0 },
     });
-    if (!atualizada) throw new Error("Sessão terminada durante a autenticação.");
+    if (!atualizada) throw new SessaoMfaExpirada("Sessão terminada durante a autenticação.");
     if (recuperacaoHash) {
       await registrarAuditoria(tx, {
         usuarioId: sessao.usuarioId,
@@ -191,7 +194,12 @@ export async function validarSegundoFator(_estado: EstadoMfa, dados: FormData): 
       });
     }
     return true;
+  }).catch((erro: unknown) => {
+    if (!(erro instanceof SessaoMfaExpirada)) throw erro;
+    sessaoExpirada = true;
+    return false;
   });
+  if (sessaoExpirada) return { erro: "A sessão expirou. Entre novamente." };
   if (!valido) return { erro: "Código inválido, já usado ou expirado." };
   await db.mfaLimite.deleteMany({ where: { usuarioId: sessao.usuarioId } });
   await zerarTentativasDoEmail(sessao.usuario.email, limite.ip);
