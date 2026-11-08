@@ -1246,14 +1246,14 @@ O site pode ser instalado como app (PWA), com o nome, as cores e os ícones de `
 
 **A navegação no celular** (`src/components/BarraInferior.tsx`)
 
-Em telas pequenas (abaixo de `sm`, 640 px), uma barra fixa no rodapé substitui o menu do topo, que fica só com o logo e a busca. No computador nada muda. A barra respeita a área do botão home do iPhone (`viewportFit: "cover"`) e o rodapé do site ganha folga para ela não cobrir os links.
+Em telas pequenas (abaixo de `sm`, 640 px), uma barra fixa no rodapé substitui o menu do topo, que fica só com o logo e a busca. Acima disso, o topo traz Explorar, Clube do Bem, Como funciona, Cadastrar, o tema e a conta. A barra respeita a área do botão home do iPhone (`viewportFit: "cover"`) e o rodapé do site ganha folga para ela não cobrir os links.
 
 - **Quem compra** (entrou ou não): Início, Explorar, Cupons, Favoritos e Conta. A aba Cupons mostra quantas ofertas estão valendo agora.
 - **Dono com negócio liberado no clube** (liberação "liberada" e ainda dono): Início, Cupons, **Validar** (botão grande no centro), Negócio e Conta. Dono sem liberação, suspensa ou recusada, vê a barra de quem compra e chega ao negócio pela Conta.
 - **Cupons** (`/cupons`) tem duas partes. **Ofertas** lista todas as ofertas valendo de negócios aprovados e fora do modo oculto (a mesma regra do perfil), da que termina primeiro para a última, com filtro por cidade. "Pegar cupom" gera o cupom (e favorita o negócio, como no perfil) e leva a **Meus cupons** (`/cupons/meus`). Quem não entrou vê "Entre para pegar o cupom".
 - **Validar** (`/validar`): o dono liberado digita o código e confere a oferta e o primeiro nome do cliente. "Marcar como usado" é a mesma ação do painel do clube, com as mesmas regras. Com mais de um negócio liberado, ele escolhe qual no topo. A tela lista os 5 últimos cupons usados no negócio. O painel do clube continua com a validação.
 - **Negócio** (`/negocio`): atalho para Validar, Ofertas do clube, Editar perfil, Depoimentos (quantos sem resposta) e perfil público. Quem ainda não foi liberado vê o convite para a verificação.
-- **Conta** (`/conta`) reúne o que ficava no menu suspenso: painel, favoritos, meus cupons, moderação, modo escuro, instalar o app, Como funciona e Sair. Quem não entrou vê "Entrar" e "Cadastrar um negócio".
+- **Conta** (`/conta`) reúne o que ficava no menu suspenso: painel, favoritos, meus cupons, moderação, modo escuro, instalar o app, Clube do Bem, Como funciona e Sair. Quem não entrou vê "Entrar" e "Cadastrar um negócio".
 
 **A página de instalação** (`src/app/instalacao/`)
 
@@ -1413,7 +1413,7 @@ Embaixadores são pessoas, em geral influenciadores, que levam o projeto para um
 
 O clube é a [issue #248](https://github.com/fabs-reis/Negocio-do-bem/issues/248): negócios oferecem descontos por pouco tempo a quem chega pelo site. Os [favoritos](#favoritos) são a primeira parte; esta seção junta as próximas.
 
-A página pública `/clube-do-bem` explica o clube com prints, para quem compra e para o dono, e repete as proteções contra golpe e as dúvidas comuns. Ela está no sitemap e é ligada pelo cartão do clube no perfil ("Como funciona"), por Meus cupons, pelo painel do clube, pela página Como funciona e pelo rodapé. Quando uma regra desta seção mudar, confira se o texto da página e os prints ainda valem.
+A página pública `/clube-do-bem` explica o clube com prints, para quem compra e para o dono, e repete as proteções contra golpe e as dúvidas comuns. Ela está no sitemap e é ligada pelo cabeçalho (acima de `sm`), pela Conta no celular, pelo cartão do clube no perfil ("Como funciona"), por Meus cupons, pelo painel do clube, pela página Como funciona e pelo rodapé. Quando uma regra desta seção mudar, confira se o texto da página e os prints ainda valem.
 
 ### Liberação para o clube
 

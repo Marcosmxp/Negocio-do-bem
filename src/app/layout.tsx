@@ -65,7 +65,7 @@ export const viewport: Viewport = {
 const ID_ANALYTICS = process.env.NEXT_PUBLIC_GA_ID;
 
 const LINK_DO_TOPO =
-  "rounded-full px-3 py-1.5 text-tinta/80 transition hover:bg-superficie hover:text-tinta focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-tinta";
+  "whitespace-nowrap rounded-full px-1.5 py-1.5 text-tinta/80 transition hover:bg-superficie hover:text-tinta focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-tinta md:px-2.5 lg:px-3";
 const LINK_DO_RODAPE =
   "underline decoration-transparent underline-offset-4 transition hover:decoration-current focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-current";
 
@@ -83,7 +83,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <Suspense fallback={null}><CortinaDePagina /></Suspense>
 
         <header className="sticky top-0 z-30 border-b border-linha bg-papel">
-          <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-2 px-4 sm:gap-4 sm:px-6">
+          <div className="mx-auto flex min-h-16 max-w-6xl items-center justify-between gap-2 px-4 py-2 sm:gap-2 sm:px-4 md:gap-4 md:px-6">
             <Link
               href="/"
               className="shrink-0 rounded-lg focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-tinta"
@@ -91,9 +91,12 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             >
               <Logo />
             </Link>
-            <nav aria-label="Principal" className="flex items-center gap-0.5 text-sm font-semibold sm:gap-1.5 sm:text-[15px]">
+            <nav aria-label="Principal" className="flex flex-wrap items-center justify-end gap-0.5 text-sm font-semibold sm:gap-1 sm:text-[13px] lg:gap-1.5 lg:text-[15px]">
               <Link href="/explorar" className={`hidden sm:block ${LINK_DO_TOPO}`}>
                 Explorar
+              </Link>
+              <Link href="/clube-do-bem" className={`hidden sm:block ${LINK_DO_TOPO}`}>
+                Clube do Bem
               </Link>
               <Link href="/sobre" className={`hidden sm:block ${LINK_DO_TOPO}`}>
                 Como funciona

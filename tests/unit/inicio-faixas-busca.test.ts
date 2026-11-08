@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 
 const inicio = readFileSync(new URL("../../src/app/inicio/inicio.css", import.meta.url), "utf8");
 const pagina = readFileSync(new URL("../../src/app/page.tsx", import.meta.url), "utf8");
+const layout = readFileSync(new URL("../../src/app/layout.tsx", import.meta.url), "utf8");
+const menuUsuario = readFileSync(new URL("../../src/components/MenuUsuario.tsx", import.meta.url), "utf8");
 
 describe("faixas de causas da página inicial", () => {
   it("o clique do mouse não faz a faixa pular", () => {
@@ -32,5 +34,20 @@ describe("busca da página inicial", () => {
   it("os campos seguem o canto da caixa", () => {
     expect(inicio).toMatch(/\.inicio-busca form\[role="search"\] label\s*\{\s*border-radius: 999px;/);
     expect(inicio).toMatch(/@media \(max-width: 40rem\)[\s\S]*\.inicio-busca form\[role="search"\] label\s*\{\s*border-radius: 0\.8rem;/);
+  });
+});
+
+describe("cabeçalho do topo", () => {
+  it("mostra Clube do Bem explícito acima do celular sem quebrar os rótulos e mantém a busca rápida no celular", () => {
+    const cabecalho = layout.match(/<header[\s\S]*?<\/header>/)?.[0] ?? "";
+    expect(layout).toMatch(/const LINK_DO_TOPO =\s*"[^"]*\bwhitespace-nowrap\b[^"]*";/);
+    expect(cabecalho).toContain("min-h-16");
+    expect(cabecalho).toMatch(/<Link href="\/explorar" className=\{`hidden sm:block \$\{LINK_DO_TOPO\}`\}>\s*Explorar\s*<\/Link>/);
+    expect(cabecalho).toMatch(/<Link href="\/clube-do-bem" className=\{`hidden sm:block \$\{LINK_DO_TOPO\}`\}>\s*Clube do Bem\s*<\/Link>/);
+    expect(cabecalho).toMatch(/<Link href="\/sobre" className=\{`hidden sm:block \$\{LINK_DO_TOPO\}`\}>\s*Como funciona\s*<\/Link>/);
+    expect(cabecalho).toMatch(/<Link href="\/participar" className=\{`hidden sm:block \$\{LINK_DO_TOPO\}`\}>\s*Cadastrar\s*<\/Link>/);
+    expect(cabecalho).toContain('aria-label="Buscar negócios"');
+    expect(menuUsuario).toContain('aria-hidden="true"');
+    expect(menuUsuario).toContain("sr-only max-w-24 truncate lg:not-sr-only");
   });
 });

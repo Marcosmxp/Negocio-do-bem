@@ -18,7 +18,7 @@ const PESSOAS = ["laranja", "terceira", "verde"] as const;
  * Menor abaixo de 360px, para caber no cabeçalho ao lado de "Indicar", do tema e de "Entrar".
  */
 export function Logo({
-  className = "h-7 min-[360px]:h-9 sm:h-11",
+  className = "h-7 min-[360px]:h-9 lg:h-11",
   versao = "cores",
 }: {
   className?: string;
