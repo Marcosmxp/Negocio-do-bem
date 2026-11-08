@@ -114,7 +114,7 @@ async function publicacaoDeSite(caminho: "edicao" | "indicacao" | "reivindicacao
   const dados = new FormData();
   for (const [campo, valor] of Object.entries({
     nome: "Negócio do bairro", categoria: "Serviços", municipio: "Recife, PE", resumo: "Um negócio do bem do bairro",
-    semInstagram: "sim", souDono: "sim", site: FOTO, telefoneComercial: "5511999999999", telefoneDoDono: "5511999999999", emailDoDono: "dona@example.test",
+    semInstagram: "sim", souDono: "sim", site: FOTO, whatsapp: "5511999999999", telefoneComercial: "5511999999999", telefoneDoDono: "5511999999999", emailDoDono: "dona@example.test",
   })) dados.set(campo, valor);
   return { publicar: () => indicarEmpresa(undefined, dados) };
 }
