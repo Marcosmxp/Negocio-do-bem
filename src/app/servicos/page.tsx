@@ -154,25 +154,25 @@ async function Lista({ searchParams }: Pick<PageProps<"/servicos">, "searchParam
           {itens.map((servico) => (
             <article key={servico.id} className="cartao group flex min-w-0 flex-col p-5 transition duration-200 hover:-translate-y-0.5 hover:border-coral/30 hover:shadow-xl hover:shadow-coral/5 sm:p-6">
               <div className="flex flex-wrap items-start justify-between gap-2">
-                <span className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-folha-50 px-3 py-1.5 text-xs font-semibold text-folha">
+                <span className="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-full bg-folha-50 px-3 py-1.5 text-xs font-semibold text-folha [overflow-wrap:anywhere]">
                   <IconeRede nome="servicos" className="h-3.5 w-3.5 shrink-0" /> {servico.categoria}
                 </span>
               </div>
-              <h3 className="mt-5 font-serif text-2xl leading-tight font-semibold tracking-tight text-balance group-hover:text-coral-700">{servico.titulo}</h3>
+              <h3 className="mt-5 min-w-0 font-serif text-2xl leading-tight font-semibold tracking-tight text-balance [overflow-wrap:anywhere] group-hover:text-coral-700">{servico.titulo}</h3>
               <p className="mt-2 flex items-center gap-2 text-sm font-medium">
                 <IconeRede nome={servico.empresa ? "empresa" : "pessoa"} className="h-4 w-4 shrink-0 text-suave" />
-                <span className="min-w-0 break-words">{servico.empresa?.nome ?? servico.perfil?.nomePublico}</span>
+                <span className="min-w-0 [overflow-wrap:anywhere]">{servico.empresa?.nome ?? servico.perfil?.nomePublico}</span>
               </p>
               <p className="mt-4 line-clamp-4 flex-1 whitespace-pre-line break-words text-sm leading-relaxed text-suave">{servico.descricao}</p>
               <div className="mt-5 flex flex-wrap items-center gap-2 text-xs text-suave">
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-papel px-2.5 py-1.5">
+                <span className="inline-flex min-w-0 max-w-full flex-wrap items-center gap-1.5 rounded-full bg-papel px-2.5 py-1.5 [overflow-wrap:anywhere]">
                   <IconeRede nome="local" className="h-3.5 w-3.5" /> {servico.presencial && servico.areasAtendimento.length ? servico.areasAtendimento.map(({ cidade, uf }) => `${cidade}, ${uf}`).join(" · ") : "Atendimento online"}
                 </span>
                 {servico.remoto && <span className="rounded-full bg-papel px-2.5 py-1.5">Remoto</span>}
                 {servico.presencial && <span className="rounded-full bg-papel px-2.5 py-1.5">Presencial</span>}
               </div>
               <div className="mt-5 border-t border-linha pt-4">
-                <p className="text-sm font-semibold text-tinta">{servico.precoReferencia || "Valor a combinar"}</p>
+                <p className="min-w-0 text-sm font-semibold text-tinta [overflow-wrap:anywhere]">{servico.precoReferencia || "Valor a combinar"}</p>
                 {servico.empresa ? (
                   <Link href={`/empresas/${servico.empresa.instagramUsername}`} className="mt-3 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-coral-700 hover:underline">
                     Ver estabelecimento <IconeRede nome="seta" className="h-4 w-4" />

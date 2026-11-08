@@ -5,6 +5,7 @@ import { moderarServico } from "@/acoes/servicos";
 import { BotaoEnviar } from "@/components/BotaoEnviar";
 import { IconeRede } from "@/components/IconeRede";
 import { Paginacao } from "@/components/Paginacao";
+import { ResumoRevisaoServico } from "./ResumoRevisaoServico";
 import { exigirModerador } from "@/lib/auth/sessao";
 import { db } from "@/lib/db";
 import { limitarPagina, numeroPagina } from "@/lib/servicos";
@@ -43,7 +44,9 @@ async function Conteudo({ searchParams }: Pick<PageProps<"/moderacao/servicos">,
     select: {
       id: true, versaoConteudo: true, titulo: true, descricao: true, categoria: true,
       cidade: true, uf: true, remoto: true, presencial: true, precoReferencia: true,
-      perfil: { select: { nomePublico: true } }, empresa: { select: { nome: true } },
+      areasAtendimento: { select: { cidade: true, uf: true }, orderBy: [{ uf: "asc" }, { cidade: "asc" }] },
+      perfil: { select: { nomePublico: true, site: true, emailContato: true } },
+      empresa: { select: { nome: true, instagramUsername: true } },
     },
     orderBy: [{ criadoEm: "asc" }, { id: "asc" }], skip: (pagina - 1) * POR_PAGINA, take: POR_PAGINA,
   });
@@ -60,17 +63,14 @@ async function Conteudo({ searchParams }: Pick<PageProps<"/moderacao/servicos">,
           {pendentes.map((servico) => (
             <article className="cartao min-w-0 space-y-4 p-5 sm:p-7" key={servico.id}>
               <header className="flex flex-col justify-between gap-3 sm:flex-row">
-                <div>
+                <div className="min-w-0 [overflow-wrap:anywhere]">
                   <h2 className="font-serif text-2xl font-semibold">{servico.titulo}</h2>
                   <p className="text-sm text-suave">{servico.perfil?.nomePublico ?? servico.empresa?.nome}</p>
                 </div>
-                <span className="text-sm text-suave">{servico.categoria} · {servico.cidade}, {servico.uf}</span>
+                <span className="min-w-0 text-sm text-suave [overflow-wrap:anywhere]">{servico.categoria} · {servico.cidade}, {servico.uf}</span>
               </header>
               <p className="whitespace-pre-wrap break-words rounded-2xl bg-papel p-4 text-sm leading-relaxed">{servico.descricao}</p>
-              <p className="text-sm text-suave">
-                {servico.remoto && "Remoto"}{servico.remoto && servico.presencial && " · "}{servico.presencial && "Presencial"}
-                {servico.precoReferencia && ` · ${servico.precoReferencia}`}
-              </p>
+              <ResumoRevisaoServico servico={servico} />
               <div className="grid gap-4 border-t border-linha pt-4 sm:grid-cols-2">
                 <form action={moderarServico} className="flex flex-col justify-end">
                   <input type="hidden" name="id" value={servico.id} />
@@ -144,7 +144,7 @@ async function Publicados({ searchParams }: Pick<PageProps<"/moderacao/servicos"
           {itens.map((servico) => (
             <article key={servico.id} className="cartao grid min-w-0 gap-4 p-5 sm:grid-cols-[minmax(0,1fr)_minmax(16rem,1fr)] sm:p-6">
               <div className="min-w-0">
-                <h3 className="break-words font-serif text-xl font-semibold">{servico.titulo}</h3>
+                <h3 className="font-serif text-xl font-semibold [overflow-wrap:anywhere]">{servico.titulo}</h3>
                 <p className="mt-2 text-sm text-suave">{servico.perfil?.nomePublico ?? servico.empresa?.nome} · {servico.categoria}</p>
               </div>
               <form action={moderarServico} className="space-y-2">
