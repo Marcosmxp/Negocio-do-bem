@@ -2,7 +2,7 @@ import { renderToReadableStream } from "react-dom/server";
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { suspenderDoClube } from "@/lib/clube";
 import { db } from "@/lib/db";
-import { criarOferta, encerrarOferta, gerarCupom, situacaoDoCupom, usarCupom, type DadosOferta } from "@/lib/ofertas";
+import { criarOferta, encerrarOferta, ErroOferta, gerarCupom, situacaoDoCupom, usarCupom, type DadosOferta } from "@/lib/ofertas";
 import { removerDono } from "@/lib/reivindicacao";
 
 const sessao = vi.hoisted(() => ({
@@ -109,6 +109,43 @@ async function criarOfertaEncerradaComCupom() {
 }
 
 describe("cupons depois de suspensão do clube ou saída do negócio do ar (#304)", () => {
+  it("recusa criar oferta se a liberação for suspensa após a pré-checagem, enquanto aguarda o lock da empresa", async () => {
+    const travada = Promise.withResolvers<void>();
+    const liberar = Promise.withResolvers<void>();
+    // Segura a linha da empresa: a criação passa na pré-checagem externa e
+    // aguarda o FOR UPDATE antes de validar novamente a liberação.
+    const trava = db.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "Empresa" WHERE id = ${empresaId} FOR UPDATE`;
+      travada.resolve();
+      await liberar.promise;
+    }, { timeout: 20_000 });
+    await travada.promise;
+    const criacao = criarOferta(empresaId, dona.id, dadosOferta()).catch((erro: unknown) => erro);
+    try {
+      let aguardando = false;
+      // Espera pela consulta realmente bloqueada no PostgreSQL, sem depender
+      // de um atraso fixo que poderia produzir falso positivo em CI.
+      for (let tentativa = 0; tentativa < 200 && !aguardando; tentativa++) {
+        const [linha] = await db.$queryRaw<{ aguardando: boolean }[]>`
+          SELECT EXISTS(
+            SELECT 1 FROM pg_stat_activity
+            WHERE pid <> pg_backend_pid()
+              AND wait_event_type = 'Lock'
+              AND query LIKE '%SELECT "instagramUsername", moderacao, oculta FROM "Empresa"%'
+          ) AS aguardando`;
+        aguardando = linha?.aguardando ?? false;
+        if (!aguardando) await new Promise((resolve) => setTimeout(resolve, 20));
+      }
+      expect(aguardando).toBe(true);
+      await suspenderDoClube({ liberacaoId, moderadorId: moderadora.id, motivo: "Bloqueio de segurança" });
+    } finally {
+      liberar.resolve();
+      await trava;
+    }
+    expect(await criacao).toBeInstanceOf(ErroOferta);
+    expect(await db.oferta.count({ where: { empresaId } })).toBe(0);
+  });
+
   it("oferta encerrada com cupom gerado, depois suspenderDoClube: o cupom fica suspenso e usarCupom recusa", async () => {
     const { ofertaId, codigo } = await criarOfertaEncerradaComCupom();
 
