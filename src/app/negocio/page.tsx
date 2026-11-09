@@ -89,7 +89,7 @@ async function Conteudo({ searchParams }: Pick<PageProps<"/negocio">, "searchPar
         <div className="space-y-3 rounded-3xl bg-coral p-5 text-white">
           <p className="font-serif text-2xl leading-tight font-semibold">Cliente com cupom?</p>
           <p className="text-sm text-white/90">Digite o código e marque o uso na hora.</p>
-          <Link href={`/validar?negocio=${escolhido.instagramUsername}`} className="inline-flex w-full items-center justify-center rounded-full bg-white px-5 py-3 text-sm font-semibold text-coral-700 transition hover:bg-papel">
+          <Link href={`/validar?negocio=${escolhido.instagramUsername}`} className="inline-flex w-full items-center justify-center rounded-full bg-white px-5 py-3 text-sm font-semibold text-terracota transition hover:bg-white/95">
             Validar cupom
           </Link>
         </div>
