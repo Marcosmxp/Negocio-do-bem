@@ -4,7 +4,7 @@ import { verificarSenha } from "@/lib/auth/senha";
 import { db } from "@/lib/db";
 import { URL_BANCO_TESTE } from "../banco-de-teste";
 
-function executarSeed(ambiente = "development") {
+function executarSeed(ambiente = "development", variaveis: Record<string, string> = {}) {
   // O subprocesso não herda configuração de deploy nem conexão com outro banco.
   execFileSync(process.execPath, ["--import", "tsx", "prisma/seed.ts"], {
     env: {
@@ -12,6 +12,7 @@ function executarSeed(ambiente = "development") {
       DATABASE_URL: URL_BANCO_TESTE,
       NODE_ENV: "development",
       ...(ambiente === "development" ? {} : { DEPLOY_ENV: ambiente }),
+      ...variaveis,
     },
     stdio: "pipe",
   });
@@ -123,6 +124,12 @@ describe("seed de demonstração", () => {
     const antes = await dadosDoBanco();
     executarSeed("preview");
     expect(await dadosDoBanco()).toEqual(antes);
+  });
+
+  it("recusa seed quando VERCEL_ENV indica produção, mesmo se DEPLOY_ENV indica preview", async () => {
+    expect(() => executarSeed("preview", { VERCEL_ENV: "production" })).toThrow();
+    expect(await db.usuario.count()).toBe(0);
+    expect(await db.empresa.count()).toBe(0);
   });
 
   it("recusa produção sem gravar dados", async () => {
