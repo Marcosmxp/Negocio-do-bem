@@ -11,14 +11,19 @@ import type { FotoDaCidade } from "@/lib/fotos-das-cidades";
 import { linkPerfil, perfilOficial } from "@/lib/instagram";
 import { nomeOficial } from "@/lib/municipios";
 
+/** Só a produção entra nos buscadores; previews ficam de fora. */
+const ambiente = ambienteDeDeploy();
+export const INDEXAVEL = ambiente ? ambiente === "production" : process.env.NODE_ENV === "production";
+
 /**
  * Endereço público do site, sem barra no final, para os links absolutos (canônico,
- * sitemap, imagens de compartilhamento). APP_URL é o domínio público canônico.
+ * sitemap, imagens de compartilhamento). APP_URL sempre tem prioridade.
+ * Sem ele, a produção usa o domínio oficial configurado no Cloudflare; o fallback
+ * localhost fica restrito ao desenvolvimento e aos previews sem endereço configurado.
  */
-export const ENDERECO_DO_SITE = (process.env.APP_URL || "http://localhost:3000").replace(/\/+$/, "");
-
-/** Só a produção entra nos buscadores; previews ficam de fora. */
-export const INDEXAVEL = ambienteDeDeploy() ? ambienteDeDeploy() === "production" : process.env.NODE_ENV === "production";
+export const ENDERECO_DO_SITE = (
+  process.env.APP_URL || (INDEXAVEL ? "https://www.negociodobem.com" : "http://localhost:3000")
+).replace(/\/+$/, "");
 
 export const NOME_DO_SITE = "Negócio do Bem";
 
