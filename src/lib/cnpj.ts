@@ -55,7 +55,10 @@ function extrairDadosCnpj(dados: Record<string, unknown>): DadosCnpj {
     situacao: texto(dados.descricao_situacao_cadastral),
     municipio: texto(dados.municipio),
     uf: texto(dados.uf),
-    socios: (Array.isArray(dados.qsa) ? (dados.qsa as Record<string, unknown>[]) : [])
+    socios: (Array.isArray(dados.qsa) ? dados.qsa : [])
+      // O retorno externo pode conter entradas nulas ou malformadas: preserva os sócios válidos.
+      .filter((socio): socio is Record<string, unknown> =>
+        typeof socio === "object" && socio !== null && !Array.isArray(socio))
       .map((socio) => ({
         nome: texto(socio.nome_socio),
         qualificacao: texto(socio.qualificacao_socio),

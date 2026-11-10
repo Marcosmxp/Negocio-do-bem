@@ -98,6 +98,23 @@ describe("consultarCnpj: projeção e contrato, sem simular persistência", () =
     });
   });
 
+  it("ignora entradas malformadas no QSA sem descartar os sócios válidos", async () => {
+    const resposta = JSON.stringify({
+      razao_social: "Empresa de exemplo",
+      qsa: [null, false, 123, "inválido", [], {}, { nome_socio: "  Ana Maria  ", qualificacao_socio: " Sócia " }],
+    });
+    const esperado = {
+      ...padrao,
+      razaoSocial: "Empresa de exemplo",
+      socios: [{ nome: "Ana Maria", qualificacao: "Sócia", cpfMascarado: null }],
+    };
+    fetchFalso.mockResolvedValueOnce(new Response(resposta));
+    expect(await consultarCnpj(cnpj)).toEqual(esperado);
+
+    fetchFalso.mockResolvedValueOnce(new Response(resposta));
+    expect(await buscarNaReceita(cnpj)).toEqual(esperado);
+  });
+
   it.each([undefined, null, "", "  ", 0, false, [], {}].map(valor => ({ valor })))("mantém os padrões para campos não textuais ou vazios ($valor)", async ({ valor }) => {
     fetchFalso.mockResolvedValueOnce(new Response(JSON.stringify({
       razao_social: valor, nome_fantasia: valor, descricao_situacao_cadastral: valor, municipio: valor, uf: valor,
